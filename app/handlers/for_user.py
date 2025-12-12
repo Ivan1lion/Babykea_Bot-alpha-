@@ -1,19 +1,18 @@
 import asyncio
-import os
 import random
 import string
 from uuid import uuid4
 import aiohttp
 import base64
+
 from aiogram import F, Router, types, Bot
-from aiogram.filters import CommandStart, Command
-from aiogram.types import Message, FSInputFile, CallbackQuery, InputMediaPhoto, PreCheckoutQuery, ContentType, SuccessfulPayment
+from aiogram.filters import CommandStart
+from aiogram.types import Message, CallbackQuery, InputMediaPhoto, PreCheckoutQuery, ContentType, SuccessfulPayment
 from aiogram.enums import ParseMode
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
 
-from app.handlers.text_for_user import text_privacy, text_offer, text_hello, text_info, text_hello2
 import app.handlers.keyboards as kb
 from app.handlers.keyboards import payment_button_keyboard
 # from app.db.crud import get_or_create_user, get_last_post_id, set_last_post_id
@@ -26,51 +25,6 @@ from app.handlers.keyboards import payment_button_keyboard
 # channel = int(os.getenv("CHANNEL_ID"))
 
 for_user_router = Router()
-
-
-# команды для кнопки МЕНЮ
-# @for_user_router.message(Command("info"))
-# async def policy_cmd(message: Message):
-#     await message.answer(text_info)
-#
-#
-# @for_user_router.message(Command("balance"))
-# async def policy_cmd(message: Message, bot: Bot, session: AsyncSession):
-#     result = await session.execute(select(User).where(User.telegram_id == message.from_user.id))
-#     user = result.scalar_one_or_none()
-#     if user.requests_left == 0:
-#         await message.answer(f"🚫 У вас закончились запросы"
-#                              f"\n\nПожалуйста, пополните баланс", reply_markup=kb.pay)
-#         return
-#     text_balance = (f"Количество запросов\n"
-#                     f"на вашем балансе: [ {user.requests_left} ]"
-#                     f"\n\nПополнить баланс можно через кнопки ниже")
-#     await message.answer(text_balance, reply_markup=kb.pay)
-#
-#
-# @for_user_router.message(Command("hello"))
-# async def offer_cmd(message: Message):
-#     # Получаем абсолютный путь к медиа-файлу
-#     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-#     GIF_PATH = os.path.join(BASE_DIR, "..", "mediafile_for_bot", "My_photo.png")
-#     gif_file = FSInputFile(os.path.abspath(GIF_PATH))
-#     # Отправляем медиа
-#     wait_msg = await message.answer_photo(photo=gif_file, caption=text_hello)
-#     await message.answer(text_hello2)
-#
-#
-# @for_user_router.message(Command("privacy"))
-# async def policy_cmd(message: Message):
-#     await message.answer(text_privacy)
-#
-#
-# @for_user_router.message(Command("offer"))
-# async def offer_cmd(message: Message):
-#     await message.answer(text_offer)
-
-
-
-
 
 
 

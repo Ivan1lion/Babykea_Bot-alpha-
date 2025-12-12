@@ -3,7 +3,7 @@ import os
 
 
 from aiogram import Bot, Dispatcher, types, F
-# from aiogram.fsm.storage.memory import MemoryStorage
+from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.enums import ParseMode
 from aiogram.client.bot import DefaultBotProperties
 # from aiogram.webhook.aiohttp_server import SimpleRequestHandler, setup_application
@@ -17,7 +17,7 @@ load_dotenv(find_dotenv())
 # from app.db.crud import notify_pending_users, fetch_and_send_unsent_post
 # from app.middlewares.db_session import DataBaseSession
 from app.handlers.for_user import for_user_router
-from app.comands_menu.bot_menu_cmds import bot_menu
+from app.comands_menu.bot_menu_cmds import bot_menu, menu_cmds_router
 # from app.openai_assistant.queue import OpenAIRequestQueue
 # from app.payments.payment_routes import yookassa_webhook_handler
 
@@ -25,10 +25,23 @@ from app.comands_menu.bot_menu_cmds import bot_menu
 
 
 
+storage = MemoryStorage()
 bot = Bot(token=os.getenv("TOKEN"), default=DefaultBotProperties(parse_mode=ParseMode.HTML))
-dp = Dispatcher()
+dp = Dispatcher(storage=storage)
 
 dp.include_router(for_user_router)
+dp.include_router(menu_cmds_router)
+
+
+# openai_queue: OpenAIRequestQueue | None = None
+#
+#
+# # Константы
+# WEBHOOK_PATH = "/webhook"
+# WEBHOOK_HOST = os.getenv("WEBHOOK_HOST")
+# WEBHOOK_URL = f"{WEBHOOK_HOST}{WEBHOOK_PATH}"
+# WEBAPP_HOST = "0.0.0.0"
+# WEBAPP_PORT = 8000
 
 
 
@@ -47,8 +60,8 @@ async def on_startup(dispatcher: Dispatcher):
                                              f"\n- 000000000000000000 "
                                              f"\n- 000000000000000000 "
                                              f"\n\nДля запуска бота нажмите пожалуйста кнопку ниже👇")
-    await bot.set_my_short_description(short_description=f"Сервис по подбору (поиску) детских колясок. Я разработал "
-                                                         f"этого бота, чтобы помогать людям "
+    await bot.set_my_short_description(short_description=f"Сервис по подбору (поиску) детских колясок. Разработан "
+                                                         f"для молодых родителей"
                                                          f"\n\nadmin: @RomanMo_admin")
     # await drop_db() # удаление Базы Данных
     # await create_db() # создание Базы Данных
@@ -72,15 +85,33 @@ async def main():
     dp.startup.register(on_startup)
     # dp.shutdown.register(on_shutdown)
     # dp.update.middleware(DataBaseSession(session_pool=session_maker)) # Middleware сессии БД
-    # await bot.set_my_commands(scope=types.BotCommandScopeAllPrivateChats) #команда для удаления кнопки меню
     await bot.set_my_commands(commands=bot_menu, scope=types.BotCommandScopeAllPrivateChats())
     await dp.start_polling(bot)
 
-
-
-
-
-
+    # # 🌐 Создаём веб-приложение
+    # app = web.Application()
+    #
+    # async def health(request):
+    #     return web.Response(text="ok")  # для проверки доступности контейнера и для Caddy
+    #
+    # app.router.add_get("/health", health)
+    #
+    # app.router.add_post("/yookassa/webhook", yookassa_webhook_handler)
+    # SimpleRequestHandler(dispatcher=dp, bot=bot).register(app, path=WEBHOOK_PATH)
+    # setup_application(app, dp, bot=bot)
+    # app.on_shutdown.append(on_shutdown)
+    #
+    # # 🚀 Запускаем aiohttp-сервер
+    # runner = web.AppRunner(app)
+    # await runner.setup()
+    # site = web.TCPSite(runner, host=WEBAPP_HOST, port=WEBAPP_PORT)
+    # await site.start()
+    #
+    # print(f"Bot is running on {WEBAPP_HOST}:{WEBAPP_PORT}")
+    # print(f"Webhook URL: {WEBHOOK_URL}")
+    #
+    # # 🕒 Бесконечное ожидание (держим процесс живым)
+    # await asyncio.Event().wait()
 
 
 if __name__ == "__main__":
