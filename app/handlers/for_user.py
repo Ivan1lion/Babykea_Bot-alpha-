@@ -31,14 +31,32 @@ for_user_router = Router()
 
 # команд СТАРТ
 @for_user_router.message(CommandStart())
-async def cmd_start(message: Message):
-    # Получаем абсолютный путь к медиа-файлу
-    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-    GIF_PATH = os.path.join(BASE_DIR, "..", "mediafile_for_bot", "video.mp4")
-    gif_file = FSInputFile(GIF_PATH)
-    # Отправляем медиа
-    wait_msg = await message.answer_video(video=gif_file, supports_streaming=True)
-    await message.answer("Привет")
+async def cmd_start(message: Message, bot: Bot):
+    # # Проверяем auto_post
+    # if user.auto_post == "idle":
+    #     user.auto_post = "post_true"
+    #     await session.commit()
+        async def send_delayed_post():
+            try:
+                await bot.copy_message(
+                    chat_id=message.chat.id,
+                    from_chat_id=-1003498991864,
+                    message_id=4  # ID сообщения
+                )
+            except Exception as e:
+                # Получаем абсолютный путь к медиа-файлу
+                BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+                GIF_PATH = os.path.join(BASE_DIR, "..", "mediafile_for_bot", "video.mp4")
+                gif_file = FSInputFile(GIF_PATH)
+                # Отправляем медиа
+                wait_msg = await message.answer_video(video=gif_file, supports_streaming=True)
+                await message.answer("Привет")
+
+        asyncio.create_task(send_delayed_post())
+        return
+
+
+
 
 
 
