@@ -47,7 +47,7 @@ async def offer_cmd(message: Message):
     # Получаем абсолютный путь к медиа-файлу
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
     GIF_PATH = os.path.join(BASE_DIR, "..", "mediafile_for_bot", "My_photo.png")
-    gif_file = FSInputFile(os.path.abspath(GIF_PATH))
+    gif_file = FSInputFile(GIF_PATH)
     # Отправляем медиа
     wait_msg = await message.answer_photo(photo=gif_file, caption=text_hello)
     await message.answer(text_hello2)

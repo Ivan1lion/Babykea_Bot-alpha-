@@ -1,3 +1,4 @@
+import os
 import asyncio
 import random
 import string
@@ -7,7 +8,7 @@ import base64
 
 from aiogram import F, Router, types, Bot
 from aiogram.filters import CommandStart
-from aiogram.types import Message, CallbackQuery, InputMediaPhoto, PreCheckoutQuery, ContentType, SuccessfulPayment
+from aiogram.types import Message, FSInputFile, CallbackQuery, InputMediaPhoto, PreCheckoutQuery, ContentType, SuccessfulPayment
 from aiogram.enums import ParseMode
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -30,21 +31,14 @@ for_user_router = Router()
 
 # команд СТАРТ
 @for_user_router.message(CommandStart())
-async def cmd_start(message: Message, bot: Bot):
-    string = (f"Я — Master Manifest. Объясняю сложное простым языком"
-              f"\n\n<blockquote>Моя задача — помочь тебе разобраться с тем как превратить желания в реальность, раскрыть силу мысли и убрать "
-              f"внутренние блоки, мешающие изобилию "
-              f"\n\nВообрази, что ты уже живёшь той жизнью, о которой мечтаешь — я (будучи огромной библиотекой знаний) "
-              f"подскажу, как к ней прийти быстрее</blockquote> "
-              f"\n\n📖 Вот как мы можем работать:"
-              f"\n1️⃣ Ты задаёшь вопрос или описываешь ситуацию"
-              f"\n2️⃣ Я даю понятные и практичные рекомендации"
-              f"\n\nНо для начала представься пожалуйста. Это важно, чтобы я понимал с кем я разговариваю "
-              f"(мужчина или женщина) и как мне к тебе обращаться "
-              f"\n\nФормат:"
-              f"\n<blockquote>Меня зовут <i>(твоё имя)</i></blockquote>"
-              f"\n\nИтак, как тебя зовут? 👋")
-    await message.answer(text=string)
+async def cmd_start(message: Message):
+    # Получаем абсолютный путь к медиа-файлу
+    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+    GIF_PATH = os.path.join(BASE_DIR, "..", "mediafile_for_bot", "video.mp4")
+    gif_file = FSInputFile(GIF_PATH)
+    # Отправляем медиа
+    wait_msg = await message.answer_video(video=gif_file, supports_streaming=True)
+    await message.answer("Привет")
 
 
 
