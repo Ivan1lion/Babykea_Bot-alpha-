@@ -1,6 +1,8 @@
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 
+user_type = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="Далее 👉",
+                                                                         callback_data="user_type")]])
 
 
 pay = InlineKeyboardMarkup(inline_keyboard=[
