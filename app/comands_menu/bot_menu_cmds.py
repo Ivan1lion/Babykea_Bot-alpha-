@@ -17,7 +17,7 @@ bot_menu = [
     BotCommand(command="what", description="⁉️ Как подобрать коляску"),
     BotCommand(command="where", description="💢 Как не сломать коляску"),
     BotCommand(command="when", description="✅ Как продлить жизнь коляске"),
-    BotCommand(command="ai_consultant", description="🤖 AI помощник"),
+    BotCommand(command="ai_consultant", description="🤖 AI консультант"),
     BotCommand(command="help", description="🆘 Помощь"),
     BotCommand(command="config", description="⚙️ Настройки"),
     BotCommand(command="privacy", description="☑️ Политика конфиденциальности"),

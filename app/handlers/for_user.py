@@ -74,7 +74,7 @@ async def clear_handler(callback: CallbackQuery):
 @for_user_router.message(~(F.text))
 async def filter(message: Message):
     await message.delete()
-    await message.answer("Запросы только в формате текста")
+    await message.answer("Запросы AI консультанту только в формате текста")
 
 
 
