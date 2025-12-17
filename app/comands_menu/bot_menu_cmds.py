@@ -13,23 +13,48 @@ menu_cmds_router = Router()
 
 
 bot_menu = [
-    BotCommand(command="start", description="🔄 Перезапуск"),
-    BotCommand(command="info", description="🤖 Как пользоваться ботом"),
-    BotCommand(command="balance", description="⭐️ Баланс (кол-во запросов)"),
-    BotCommand(command="hello", description="👋 ПРИВЕТ"),
+    BotCommand(command="activation", description="🔐 Код активации"),
+    BotCommand(command="what", description="⁉️ Как подобрать коляску"),
+    BotCommand(command="where", description="💢 Как не сломать коляску"),
+    BotCommand(command="when", description="✅ Как продлить жизнь коляске"),
+    BotCommand(command="ai_consultant", description="🤖 AI помощник"),
+    BotCommand(command="help", description="🆘 Помощь"),
+    BotCommand(command="config", description="⚙️ Настройки"),
     BotCommand(command="privacy", description="☑️ Политика конфиденциальности"),
     BotCommand(command="offer", description="📜 Оферта"),
 ]
 
 
 # команды для кнопки МЕНЮ
-@menu_cmds_router.message(Command("info"))
+@menu_cmds_router.message(Command("activation"))
 async def policy_cmd(message: Message):
-    await message.answer(text_info)
+    await message.answer("Ваш личный код-пароль, код доступа к полной версии бота или оплатите 1900р.")
 
 
-@menu_cmds_router.message(Command("balance"))
+
+@menu_cmds_router.message(Command("what"))
+async def policy_cmd(message: Message):
+    await message.answer(f" 1. Карусель видеороликов о нюансах подбора детской коляски"
+                         f"\n\n 2. Квиз по подбору типа коляски"
+                         f"\n\n 3. Тригер про AI с призывам сделать запрос")
+
+
+@menu_cmds_router.message(Command("where"))
+async def policy_cmd(message: Message):
+    await message.answer(f" 1. Карусель видеороликов о правилах правильной эксплуатации"
+                         f"\n\n 2. Призыв перейти в раздел '💊 Как продлить жизнь коляске'")
+
+
+@menu_cmds_router.message(Command("when"))
+async def policy_cmd(message: Message):
+    await message.answer(f" 1. Карусель видеороликов о ТО детской коляски"
+                         f"\n\n 2. Запуск времени до планового ТО")
+
+
+@menu_cmds_router.message(Command("ai_consultant"))
 async def policy_cmd(message: Message, bot: Bot, session: AsyncSession):
+    await message.answer(f" 1. Видео или статья о том как пользоваться консультантом"
+                         f"\n\n 2. Баланс (кол-во запросов)")
     result = await session.execute(select(User).where(User.telegram_id == message.from_user.id))
     user = result.scalar_one_or_none()
     if user.requests_left == 0:
@@ -42,15 +67,19 @@ async def policy_cmd(message: Message, bot: Bot, session: AsyncSession):
     await message.answer(text_balance, reply_markup=kb.pay)
 
 
-@menu_cmds_router.message(Command("hello"))
-async def offer_cmd(message: Message):
-    # Получаем абсолютный путь к медиа-файлу
-    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-    GIF_PATH = os.path.join(BASE_DIR, "..", "mediafile_for_bot", "My_photo.png")
-    gif_file = FSInputFile(GIF_PATH)
-    # Отправляем медиа
-    wait_msg = await message.answer_photo(photo=gif_file, caption=text_hello)
-    await message.answer(text_hello2)
+@menu_cmds_router.message(Command("help"))
+async def policy_cmd(message: Message):
+    await message.answer(f" 1. Адрес магазина («Ваш магазин»)"
+                         f"\n\n 2. Ответы на частые вопросы (Типовые и по модели коляски пользователя)")
+
+
+@menu_cmds_router.message(Command("config"))
+async def policy_cmd(message: Message):
+    await message.answer(f" 1. Выбор статуса"
+                         f"\n\n 2. Указать ПДР или возраст ребенка"
+                         f"\n\n 3. Изменить время ТО")
+
+
 
 
 @menu_cmds_router.message(Command("privacy"))

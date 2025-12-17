@@ -29,6 +29,7 @@ for_user_router = Router()
 
 
 
+
 # команд СТАРТ
 @for_user_router.message(CommandStart())
 async def cmd_start(message: Message, bot: Bot):
@@ -39,8 +40,8 @@ async def cmd_start(message: Message, bot: Bot):
     try:
         await bot.copy_message(
             chat_id=message.chat.id,
-            from_chat_id=-1003498991864,
-            message_id=4,  # ID сообщения
+            from_chat_id=-1003498991864, # ID группы
+            message_id=4,  # ID сообщения из группы
             reply_markup=kb.user_type
         )
     except Exception as e:
@@ -53,15 +54,22 @@ async def cmd_start(message: Message, bot: Bot):
 
 
 
-
-
-
-
-
-
-
-
 # ОБРАБОТЧИКИ
+
+
+@for_user_router.callback_query(F.data == "user_type")
+async def clear_handler(callback: CallbackQuery):
+    await callback.answer()
+    await callback.message.edit_reply_markup(reply_markup=None)
+    # Получаем абсолютный путь к медиа-файлу
+    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+    GIF_PATH = os.path.join(BASE_DIR, "..", "mediafile_for_bot", "My_photo.png")
+    gif_file = FSInputFile(GIF_PATH)
+    # Отправляем медиа
+    await callback.message.answer_photo(photo=gif_file,caption=f'Вы перешли на вкладку "Далее"')
+
+
+
 
 @for_user_router.message(~(F.text))
 async def filter(message: Message):
@@ -71,8 +79,7 @@ async def filter(message: Message):
 
 
 
-
-# обработка запросов пользователя
+######################### Обработка запросов пользователя к AI #########################
 
 
 # Функция, чтобы крутился индикатор "печатает"
@@ -89,31 +96,13 @@ async def filter(message: Message):
 #         await message.answer(f"🚫 У вас закончились запросы\n\nПожалуйста, пополните баланс"
 #                              f"\n\n<a href='https://telegra.ph/pvapavp-07-04'>"
 #                              "(Почему бот стал платным?)</a>", reply_markup=kb.pay)
-#         # Проверяем auto_post
-#         if user.auto_post == "idle":
-#             user.auto_post = "post_true"
-#             await session.commit()
-#
-#             async def send_delayed_post():
-#                 await asyncio.sleep(120)  # Ждём 2 минуты
-#                 try:
-#                     await bot.forward_message(
-#                         chat_id=message.chat.id,
-#                         from_chat_id=-1002837737377,
-#                         message_id=19  # ID сообщения
-#                     )
-#                 except Exception as e:
-#                     print(f"Ошибка пересылки сообщения: {e}")
-#
-#             asyncio.create_task(send_delayed_post())
-#         return
 #
 #     if not openai_queue:
 #         await message.answer("⚠️ Ассистент временно недоступен\n\nПовторите пожалуйста запрос позже")
 #         return
 #
 #     try:
-#         typing_msg = await message.answer("Master Manifest пишет 💬") # Отправляем текст
+#         typing_msg = await message.answer("Ваш запрос обрабатывается и готовиться ответ 💬") # Отправляем текст
 #
 #         # 🟡 Обновляем статус запроса
 #         user.request_status = "pending"
