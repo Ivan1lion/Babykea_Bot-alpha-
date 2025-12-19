@@ -13,9 +13,9 @@ from aiogram.client.bot import DefaultBotProperties
 from dotenv import find_dotenv, load_dotenv
 load_dotenv(find_dotenv())
 
-# from app.db.config import create_db, drop_db, session_maker
+from app.db.config import create_db, drop_db, session_maker
 # from app.db.crud import notify_pending_users, fetch_and_send_unsent_post
-# from app.middlewares.db_session import DataBaseSession
+from app.middlewares.db_session import DataBaseSession
 from app.handlers.for_user import for_user_router
 from app.comands_menu.bot_menu_cmds import bot_menu, menu_cmds_router
 # from app.openai_assistant.queue import OpenAIRequestQueue
@@ -64,7 +64,7 @@ async def on_startup(dispatcher: Dispatcher):
                                                          f"для молодых родителей"
                                                          f"\n\nadmin: @RomanMo_admin")
     # await drop_db() # удаление Базы Данных
-    # await create_db() # создание Базы Данных
+    await create_db() # создание Базы Данных
     # global openai_queue
     # openai_queue = OpenAIRequestQueue()
     # await notify_pending_users(bot, session_maker)
@@ -72,9 +72,9 @@ async def on_startup(dispatcher: Dispatcher):
     #     await fetch_and_send_unsent_post(bot, session)
 
 
-# async def on_shutdown(dispatcher: Dispatcher):
-#     print("on_shutdown")
-#     await bot.session.close()
+async def on_shutdown(dispatcher: Dispatcher):
+    print("on_shutdown")
+    await bot.session.close()
 
 
 
@@ -83,8 +83,8 @@ async def on_startup(dispatcher: Dispatcher):
 async def main():
     await bot.delete_webhook(drop_pending_updates=True)
     dp.startup.register(on_startup)
-    # dp.shutdown.register(on_shutdown)
-    # dp.update.middleware(DataBaseSession(session_pool=session_maker)) # Middleware сессии БД
+    dp.shutdown.register(on_shutdown)
+    dp.update.middleware(DataBaseSession(session_pool=session_maker)) # Middleware сессии БД
     await bot.set_my_commands(commands=bot_menu, scope=types.BotCommandScopeAllPrivateChats())
     await dp.start_polling(bot)
 

@@ -76,7 +76,8 @@ async def policy_cmd(message: Message):
 @menu_cmds_router.message(Command("config"))
 async def policy_cmd(message: Message):
     await message.answer(f" 1. Выбор статуса"
-                         f"\n\n 2. Указать ПДР или возраст ребенка"
+                         f"\n\n 2. Указать ПДР или возраст ребенка (развития ребенка по месяцам (что и когда он "
+                         f"должен делать), календарь прививок (показывает когда и какую нужно сделать плановую прививку)"
                          f"\n\n 3. Изменить время ТО")
 
 

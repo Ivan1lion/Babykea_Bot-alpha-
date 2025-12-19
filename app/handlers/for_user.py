@@ -66,7 +66,11 @@ async def clear_handler(callback: CallbackQuery):
     GIF_PATH = os.path.join(BASE_DIR, "..", "mediafile_for_bot", "My_photo.png")
     gif_file = FSInputFile(GIF_PATH)
     # Отправляем медиа
-    await callback.message.answer_photo(photo=gif_file,caption=f'Вы перешли на вкладку "Далее"')
+    await callback.message.answer_photo(photo=gif_file,caption=f'Выберете пожалуйста верное утверждение:'
+                                                               f'\n\n1. Я в положении - ищу коляску для новорожденного'
+                                                               f'\n\n2. Ищу прогулочную коляску для ребенка от 6 мес. и '
+                                                               f'старше'
+                                                               f'\n\n3. ')
 
 
 
