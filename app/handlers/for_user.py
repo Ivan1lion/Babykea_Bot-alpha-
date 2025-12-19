@@ -16,9 +16,9 @@ from sqlalchemy import select
 
 import app.handlers.keyboards as kb
 from app.handlers.keyboards import payment_button_keyboard
-# from app.db.crud import get_or_create_user, get_last_post_id, set_last_post_id
-# from app.db.models import User
-# from app.db.config import session_maker
+from app.db.crud import get_or_create_user, get_last_post_id, set_last_post_id
+from app.db.models import User
+from app.db.config import session_maker
 # from app.openai_assistant.client import ask_assistant
 # from app.openai_assistant.queue import openai_queue
 
@@ -32,7 +32,8 @@ for_user_router = Router()
 
 # команд СТАРТ
 @for_user_router.message(CommandStart())
-async def cmd_start(message: Message, bot: Bot):
+async def cmd_start(message: Message, bot: Bot, session: AsyncSession):
+    await get_or_create_user(session, message.from_user.id, message.from_user.username)
     # # Проверяем auto_post
     # if user.auto_post == "idle":
     #     user.auto_post = "post_true"

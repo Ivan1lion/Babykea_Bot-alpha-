@@ -20,37 +20,37 @@ async def get_or_create_user(session: AsyncSession, telegram_id: int, username: 
     result = await session.execute(select(User).where(User.telegram_id == telegram_id))
     user = result.scalar_one_or_none()
 
-    if user:
-        # Создаём новый thread через OpenAI API
-        thread = await client.beta.threads.create()
-        if not thread or not thread.id:
-            await message.answer("❌ Не удалось обновить сессию. Попробуйте позже.")
-            raise RuntimeError("❌ Не удалось создать thread через OpenAI API")
-
-        # Обновляем thread_id у существующего пользователя
-        user.thread_id = thread.id
-        await session.commit()
-        await session.refresh(user)
-        return user
-
-
-
-    # Новый пользователь → создать thread через OpenAI
-    thread = await client.beta.threads.create()
-    if not thread or not thread.id:
-        await message.answer("❌ Не удалось обновить сессию. Попробуйте позже.")
-        raise RuntimeError("❌ Не удалось создать thread через OpenAI API")
+    # if user:
+    #     # Создаём новый thread через OpenAI API
+    #     thread = await client.beta.threads.create()
+    #     if not thread or not thread.id:
+    #         await message.answer("❌ Не удалось обновить сессию. Попробуйте позже.")
+    #         raise RuntimeError("❌ Не удалось создать thread через OpenAI API")
+    #
+    #     # Обновляем thread_id у существующего пользователя
+    #     user.thread_id = thread.id
+    #     await session.commit()
+    #     await session.refresh(user)
+    #     return user
+    #
+    # # Новый пользователь → создать thread через OpenAI
+    # thread = await client.beta.threads.create()
+    # if not thread or not thread.id:
+    #     await message.answer("❌ Не удалось обновить сессию. Попробуйте позже.")
+    #     raise RuntimeError("❌ Не удалось создать thread через OpenAI API")
 
     new_user = User(
         telegram_id=telegram_id,
         username=username,
-        thread_id=thread.id,  # 👈 это будет вида thread_abc123...
-        requests_left=3,
+        # thread_id=thread.id,  # 👈 это будет вида thread_abc123...
+        requests_left=1,
     )
     session.add(new_user)
     await session.commit()
     await session.refresh(new_user)
     return new_user
+
+
 
 
 # Уменьшить количество оставшихся запросов

@@ -48,8 +48,9 @@ class User(Base):
 
     magazine_id: Mapped[int] = mapped_column(
         ForeignKey("magazines.id"),
-        nullable=False
+        nullable=True
     )
+    requests_left: Mapped[int] = mapped_column(Integer, default=1)
     is_active: Mapped[bool] = mapped_column(default=True)
 
 
