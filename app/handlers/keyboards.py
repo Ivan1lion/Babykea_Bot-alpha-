@@ -4,6 +4,12 @@ from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 user_type = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="Далее 👉",
                                                                          callback_data="user_type")]])
 
+user_group = InlineKeyboardMarkup(inline_keyboard=[
+    [InlineKeyboardButton(text="1 🤰", callback_data="pay30"),
+     InlineKeyboardButton(text="2 👶", callback_data="pay550")],
+     [InlineKeyboardButton(text="3", callback_data="pay2500")],
+                                              ])
+
 
 pay = InlineKeyboardMarkup(inline_keyboard=[
     [InlineKeyboardButton(text="1 запрос - 30р.", callback_data="pay30"),
