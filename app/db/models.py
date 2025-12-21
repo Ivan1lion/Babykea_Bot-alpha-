@@ -23,9 +23,9 @@ class Magazine(Base):
         nullable=False
     )
 
-    store_name: Mapped[str] = mapped_column(String(150), nullable=False)
+    name: Mapped[str] = mapped_column(String(150), nullable=False)
     city: Mapped[str] = mapped_column(String(100), nullable=True)
-    store_address: Mapped[str] = mapped_column(String(255), nullable=True)
+    address: Mapped[str] = mapped_column(String(255), nullable=True)
     website: Mapped[str] = mapped_column(String(255), nullable=True)
 
 
@@ -69,7 +69,7 @@ class User(Base):
 
 
 
-# Таблица для постинга
+# Таблица для постинга. Каналы магазинов (2+ на магазин)
 class MagazineChannel(Base):
     __tablename__ = "magazine_channels"
 
@@ -81,7 +81,7 @@ class MagazineChannel(Base):
 
 
 
-# Таблица для постинга
+# Таблица для постинга. Посты из каналов магазинов (журнал)
 class ChannelState(Base):
     __tablename__ = "channel_states"
 

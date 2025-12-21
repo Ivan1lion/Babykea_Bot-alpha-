@@ -1,0 +1,60 @@
+
+
+
+
+
+# Таблица для магазина
+class Magazine(Base):
+    __tablename__ = "magazines"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+
+    promo_code:      Промо-код который магазин дает клиенту для полного доступа к боту (необходим для связи Магазин-Клиент)
+    name:      Название магазина
+    city:            город в котором находится подключенный магазин партнер
+    address:   адрес магазина
+    website:         сайт магазина
+
+
+
+
+# Таблица пользователя
+class User(Base):
+    __tablename__ = "users"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+
+    promo_code:         Промо-код который вводит клиент для полного доступа к боту (необходим для связи Магазин-Клиент)
+    telegram_id:        id Телеги пользователя
+    username:           username пользователя
+    magazine_id:        для связи через ForeignKey("magazines.id")
+    requests_left:      сколько осталось запросов к AI консультанту
+    is_active:          вкл/отключение пользователя из рассылки постов
+
+
+
+
+# Таблица для постинга. Каналы магазинов (2+ на магазин)
+class MagazineChannel(Base):
+    __tablename__ = "magazine_channels"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+
+    magazine_id:    для связи через ForeignKey("magazines.id")
+    channel_id:     реальный Telegram ID канала (-100...) из которого будет производиться рассылка постов
+    channel_type:   тип канала (от рождения, 6 мес +)
+    is_active:      вкл/отключение рассылки из этого канала без деплоя и перезапуска бота. Через БД.
+
+
+
+# Таблица для постинга. Посты из каналов магазинов (журнал)
+class ChannelState(Base):
+    __tablename__ = "channel_states"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+
+    channel_id:      Telegram ID канала
+    post_id:         номер (id) поста в канале
+    magazine_id:     магазин, к которому относится пост ForeignKey("magazines.id")
+
+
