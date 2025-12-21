@@ -1,7 +1,7 @@
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 from sqlalchemy.ext.asyncio import AsyncAttrs
 from sqlalchemy.sql import func
-from sqlalchemy import BigInteger, Integer, String, DateTime, ForeignKey
+from sqlalchemy import BigInteger, Integer, String, DateTime, ForeignKey, UniqueConstraint
 from typing import Optional
 
 
@@ -10,7 +10,7 @@ class Base(AsyncAttrs, DeclarativeBase):
     created_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
-# Таблица для магазина
+#1 Таблица для магазина
 class Magazine(Base):
     __tablename__ = "magazines"
 
@@ -31,7 +31,7 @@ class Magazine(Base):
 
 
 
-# Таблица пользователя
+#2 Таблица пользователя
 class User(Base):
     __tablename__ = "users"
 
@@ -55,33 +55,21 @@ class User(Base):
 
 
 
-    # id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    # promo_code: Mapped[str] = mapped_column(String(150), nullable=True)
-    # telegram_id: Mapped[int] = mapped_column(BigInteger, unique=True, index=True)
-    # username: Mapped[str] = mapped_column(String(150), nullable=True)
-    # thread_id: Mapped[str] = mapped_column(String(128), unique=True, nullable=True)
-    # requests_left: Mapped[int] = mapped_column(Integer, default=3)
-    # request_status: Mapped[str] = mapped_column(String(20), default="idle")
-    # email: Mapped[str] = mapped_column(String(128), default="idle")
-    # auto_post: Mapped[str] = mapped_column(String(128), default="idle")
-    # slot1: Mapped[str] = mapped_column(String(128), default="idle")
-    # slot2: Mapped[int] = mapped_column(Integer, default=0)
 
 
-
-# Таблица для постинга. Каналы магазинов (2+ на магазин)
+#3 Таблица для постинга. Каналы магазинов (2+ на магазин)
 class MagazineChannel(Base):
     __tablename__ = "magazine_channels"
 
     id: Mapped[int] = mapped_column(primary_key=True)
     magazine_id: Mapped[int] = mapped_column(ForeignKey("magazines.id"), nullable=False)
-    channel_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    channel_id: Mapped[int] = mapped_column(BigInteger, unique=True, nullable=False)
     channel_type: Mapped[str] = mapped_column(String(20), nullable=False)
     is_active: Mapped[bool] = mapped_column(default=True)
 
 
 
-# Таблица для постинга. Посты из каналов магазинов (журнал)
+#4 Таблица для постинга. Посты из каналов магазинов (журнал)
 class ChannelState(Base):
     __tablename__ = "channel_states"
 
@@ -90,4 +78,37 @@ class ChannelState(Base):
     post_id: Mapped[int] = mapped_column(nullable=False)
     magazine_id: Mapped[int] = mapped_column(ForeignKey("magazines.id"), nullable=False)
 
-    # last_post_id: Mapped[int] = mapped_column(Integer, default=0)
+    __table_args__ = (
+        UniqueConstraint("channel_id", "post_id"),
+    )
+
+
+#5 Таблица для постинга из МОЕГО ЛИЧНОГО канала. Сдесь будет id моего канала
+class MyChannel(Base):
+    __tablename__ = "my_channels"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+
+    channel_id: Mapped[int] = mapped_column(
+        BigInteger,
+        unique=True,
+        nullable=False
+    )
+
+    is_active: Mapped[bool] = mapped_column(default=True)
+
+
+
+#6Таблица номеров ПОСТОВ из МОЕГО ЛИЧНОГО канала. Сдесь будет id моего последнего поста
+class MyPost(Base):
+    __tablename__ = "my_posts"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+
+    channel_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    post_id: Mapped[int] = mapped_column(nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint("channel_id", "post_id"),
+    )
+
