@@ -17,8 +17,11 @@ from sqlalchemy import select
 import app.handlers.keyboards as kb
 from app.handlers.keyboards import payment_button_keyboard
 from app.db.crud import get_or_create_user, get_last_post_id, set_last_post_id
-from app.db.models import User
+from app.db.models import User, MagazineChannel, ChannelState
 from app.db.config import session_maker
+from app.posting.resolver import resolve_channel_context
+from app.posting.state import is_new_post
+from app.posting.dispatcher import dispatch_post
 # from app.openai_assistant.client import ask_assistant
 # from app.openai_assistant.queue import openai_queue
 
@@ -65,8 +68,8 @@ async def clear_handler(callback: CallbackQuery, bot: Bot):
     try:
         await bot.copy_message(
             chat_id=callback.message.chat.id,
-            from_chat_id=-1003498991864, # ID группы
-            message_id=5,  # ID сообщения из группы
+            from_chat_id=-1003498991864, # ID канала
+            message_id=5,  # ID сообщения из канала
             caption=f"Выберете пожалуйста верное утверждение:"
                     f"\n\n1. Я в положении - ищу коляску для новорожденного 🤰"
                     f"\n\n2. Ищу прогулочную коляску для ребенка от 6 мес. и старше 👶"
@@ -299,4 +302,28 @@ async def filter(message: Message):
 #
 #
 #
-#
+
+
+
+# Отправка сообщений/постов из каналов
+
+@for_user_router.channel_post()
+async def channel_post_handler(message: Message) -> None:
+    """
+    Entry point для всех постов из каналов
+    """
+
+    # 1. Определяем: чей это канал и нужен ли он нам
+    context = await resolve_channel_context(message)
+    if context is None:
+        return
+
+    # 2. Проверяем — новый ли это пост
+    if not await is_new_post(context, message.message_id):
+        return
+
+    # 3. Отправляем пост в очередь рассылки
+    await dispatch_post(
+        context=context,
+        message=message,
+    )

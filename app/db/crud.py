@@ -4,7 +4,8 @@ from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from openai import AsyncOpenAI
 from .models import User
-from app.db.models import ChannelState
+from app.db.models import ChannelState, MagazineChannel, MyChannel
+
 
 
 # Инициализируем OpenAI клиента один раз
@@ -14,7 +15,9 @@ client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 channel = int(os.getenv("CHANNEL_ID"))
 
 
-# Получить пользователя или создать нового
+                                        ###  ###  ###  Для AI  ###  ###  ###
+
+# Получить пользователя или создать нового + создание thread через OpenAI API
 async def get_or_create_user(session: AsyncSession, telegram_id: int, username: str,) -> User:
     # Проверка: есть ли пользователь
     result = await session.execute(select(User).where(User.telegram_id == telegram_id))
@@ -53,7 +56,7 @@ async def get_or_create_user(session: AsyncSession, telegram_id: int, username: 
 
 
 
-# Уменьшить количество оставшихся запросов
+# Уменьшить количество оставшихся запросов к AI
 async def decrement_requests(session: AsyncSession, telegram_id: int) -> None:
     await session.execute(
         update(User)
@@ -62,7 +65,7 @@ async def decrement_requests(session: AsyncSession, telegram_id: int) -> None:
     )
     await session.commit()
 
-# Увеличить количество запросов
+# Увеличить количество запросов к AI
 async def increment_requests(session: AsyncSession, telegram_id: int, count: int):
     await session.execute(
         update(User)
@@ -73,9 +76,7 @@ async def increment_requests(session: AsyncSession, telegram_id: int, count: int
 
 
 
-
-
-# на случай перезагрузки/сбоя бота
+# на случай перезагрузки/сбоя бота при отправки запроса к AI
 async def notify_pending_users(bot: Bot, session_factory):
     async with session_factory() as session:
         result = await session.execute(select(User).where(User.request_status == 'pending'))
@@ -93,11 +94,21 @@ async def notify_pending_users(bot: Bot, session_factory):
 
 
 
+                                ###  ###  ###  Для ПОСТИНГА  ###  ###  ###
+
+
+
+
+
+
+
+
 
 # добавление в базу номера последнего поста в канале
 async def get_last_post_id(session):
     state = await session.get(ChannelState, 1)
     return state.last_post_id if state else 0
+
 
 async def set_last_post_id(session, post_id: int):
     state = await session.get(ChannelState, 1)
@@ -110,7 +121,7 @@ async def set_last_post_id(session, post_id: int):
 
 
 
-# на случай перезагрузки/сбоя бота
+# на случай перезагрузки/сбоя бота при отправик сообщений из КАНАЛОВ
 async def fetch_and_send_unsent_post(bot: Bot, session: AsyncSession):
     try:
         last_sent_id = await get_last_post_id(session)

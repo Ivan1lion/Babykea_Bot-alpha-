@@ -1,0 +1,8 @@
+ app/
+  ├── handlers/
+  │       └── for_user.py
+  ├── posting/
+  │       ├── resolver.py
+  │       ├── state.py
+  │       ├── dispatcher.py
+  │       └── queue.py

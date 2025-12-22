@@ -50,6 +50,7 @@ class User(Base):
         ForeignKey("magazines.id"),
         nullable=True
     )
+    user_type: Mapped[str] = mapped_column(String(150), default="group_1")
     requests_left: Mapped[int] = mapped_column(Integer, default=1)
     is_active: Mapped[bool] = mapped_column(default=True)
 
@@ -78,9 +79,7 @@ class ChannelState(Base):
     post_id: Mapped[int] = mapped_column(nullable=False)
     magazine_id: Mapped[int] = mapped_column(ForeignKey("magazines.id"), nullable=False)
 
-    __table_args__ = (
-        UniqueConstraint("channel_id", "post_id"),
-    )
+
 
 
 #5 Таблица для постинга из МОЕГО ЛИЧНОГО канала. Сдесь будет id моего канала
@@ -105,10 +104,8 @@ class MyPost(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
 
-    channel_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    channel_id: Mapped[int] = mapped_column(BigInteger, unique=True, nullable=False)
     post_id: Mapped[int] = mapped_column(nullable=False)
 
-    __table_args__ = (
-        UniqueConstraint("channel_id", "post_id"),
-    )
+
 
