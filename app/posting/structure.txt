@@ -1,8 +1,8 @@
  app/
   ├── handlers/
-  │       └── for_user.py
+  │       └── for_user.py     - хэндлер для постинга
   ├── posting/
-  │       ├── resolver.py
-  │       ├── state.py
-  │       ├── dispatcher.py
-  │       └── queue.py
+  │       ├── resolver.py     - проверка от куда пост
+  │       ├── state.py        - проверка и обновление постов в бд
+  │       ├── dispatcher.py   - получение целевых пользователей
+  │       └── queue.py        - безопасная отправка поста, добавление в очередь (25 рассылок в 1 секунду)

@@ -49,7 +49,8 @@ async def _safe_send(
     telegram_id: int,
     message: Message,
 ) -> None:
-    await bot.copy_message(
+    # копирование поста в бот (forward_message)
+    await bot.forward_message(
         chat_id=telegram_id,
         from_chat_id=message.chat.id,
         message_id=message.message_id,

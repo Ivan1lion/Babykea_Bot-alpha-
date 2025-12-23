@@ -298,10 +298,10 @@ async def filter(message: Message):
 #
 #         # Обновляем last_post_id
 #         await set_last_post_id(session, message.message_id)
-#
-#
-#
-#
+
+
+
+
 
 
 

@@ -14,7 +14,7 @@ from dotenv import find_dotenv, load_dotenv
 load_dotenv(find_dotenv())
 
 from app.db.config import create_db, drop_db, session_maker
-# from app.db.crud import notify_pending_users, fetch_and_send_unsent_post
+from app.db.crud import notify_pending_users
 from app.middlewares.db_session import DataBaseSession
 from app.handlers.for_user import for_user_router
 from app.comands_menu.bot_menu_cmds import bot_menu, menu_cmds_router
@@ -70,8 +70,7 @@ async def on_startup(dispatcher: Dispatcher):
     # global openai_queue
     # openai_queue = OpenAIRequestQueue()
     # await notify_pending_users(bot, session_maker)
-    # async with session_maker() as session:
-    #     await fetch_and_send_unsent_post(bot, session)
+
 
 
 async def on_shutdown(dispatcher: Dispatcher):
