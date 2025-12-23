@@ -22,6 +22,22 @@ async def get_or_create_user(session: AsyncSession, telegram_id: int, username: 
     # Проверка: есть ли пользователь
     result = await session.execute(select(User).where(User.telegram_id == telegram_id))
     user = result.scalar_one_or_none()
+    if user:
+        # 2️⃣ Если есть, активируем и обновляем username
+        user.is_active = True
+        user.username = username
+        await session.commit()
+        await session.refresh(user)
+        return user
+
+        # 3️⃣ Если нет, создаём нового
+    new_user = User(
+        telegram_id=telegram_id,
+        username=username,
+        requests_left=1,
+        # thread_id=thread.id, # 👈 это будет вида thread_abc123...
+        is_active=True,  # обязательно активируем нового
+    )
 
     # if user:
     #     # Создаём новый thread через OpenAI API
@@ -42,12 +58,6 @@ async def get_or_create_user(session: AsyncSession, telegram_id: int, username: 
     #     await message.answer("❌ Не удалось обновить сессию. Попробуйте позже.")
     #     raise RuntimeError("❌ Не удалось создать thread через OpenAI API")
 
-    new_user = User(
-        telegram_id=telegram_id,
-        username=username,
-        # thread_id=thread.id,  # 👈 это будет вида thread_abc123...
-        requests_left=1,
-    )
     session.add(new_user)
     await session.commit()
     await session.refresh(new_user)

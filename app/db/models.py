@@ -75,7 +75,7 @@ class ChannelState(Base):
     __tablename__ = "channel_states"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    channel_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    channel_id: Mapped[int] = mapped_column(BigInteger, nullable=False, unique=True, index=True)
     post_id: Mapped[int] = mapped_column(nullable=False)
     magazine_id: Mapped[int] = mapped_column(ForeignKey("magazines.id"), nullable=False)
 
