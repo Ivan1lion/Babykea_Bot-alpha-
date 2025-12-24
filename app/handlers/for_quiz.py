@@ -4,7 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import User
 from app.db.crud import get_or_create_user
-from app.quiz.renderer import render_quiz_step
+from app.quiz.renderer import render_quiz_step, resolve_media, build_keyboard
 from app.quiz.quiz_state_service import (
     get_or_create_quiz_profile,
     get_current_step,
@@ -29,24 +29,31 @@ async def quiz_start(
     session: AsyncSession,
 ):
     user = await get_or_create_user(
-    session=session,
-    telegram_id=call.from_user.id,
-    username=call.from_user.username,
-)
+        session=session,
+        telegram_id=call.from_user.id,
+        username=call.from_user.username,
+    )
     profile = await get_or_create_quiz_profile(session, user)
 
-    # ⚠️ очищаем только временный выбор (на случай если юзер решит заново пройти квиз)
+    # очищаем только временный выбор
     profile.data.pop("_selected", None)
     session.add(profile)
     await session.commit()
 
-    await render_quiz_step(
-        bot=bot,
+    # Первый шаг — отправляем фото-квиз заново
+    step = get_current_step(profile)
+    photo, text = resolve_media(step, None)
+    msg = await bot.send_photo(
         chat_id=call.message.chat.id,
-        message_id=call.message.message_id,
-        profile=profile,
-        selected=None,
+        photo=photo,
+        caption=text,
+        reply_markup=build_keyboard(step, None)
     )
+
+    # сохраняем message_id нового фото-сообщения для редактирования
+    profile.quiz_message_id = msg.message_id
+    session.add(profile)
+    await session.commit()
 
 
 
