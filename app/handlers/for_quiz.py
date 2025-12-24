@@ -3,6 +3,7 @@ from aiogram.types import CallbackQuery
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import User
+from app.db.crud import get_or_create_user
 from app.quiz.renderer import render_quiz_step
 from app.quiz.quiz_state_service import (
     get_or_create_quiz_profile,
@@ -27,7 +28,11 @@ async def quiz_start(
     bot: Bot,
     session: AsyncSession,
 ):
-    user = await session.get(User, call.from_user.id)
+    user = await get_or_create_user(
+    session=session,
+    telegram_id=call.from_user.id,
+    username=call.from_user.username,
+)
     profile = await get_or_create_quiz_profile(session, user)
 
     # ⚠️ очищаем только временный выбор (на случай если юзер решит заново пройти квиз)
@@ -61,7 +66,11 @@ async def quiz_select_option(
 ):
     selected_option = call.data.split(":")[2]
 
-    user = await session.get(User, call.from_user.id)
+    user = await get_or_create_user(
+    session=session,
+    telegram_id=call.from_user.id,
+    username=call.from_user.username,
+)
     profile = await get_or_create_quiz_profile(session, user)
 
     # временно сохраняем выбор
@@ -92,7 +101,11 @@ async def quiz_next(
     bot: Bot,
     session: AsyncSession,
 ):
-    user = await session.get(User, call.from_user.id)
+    user = await get_or_create_user(
+    session=session,
+    telegram_id=call.from_user.id,
+    username=call.from_user.username,
+)
     profile = await get_or_create_quiz_profile(session, user)
 
     step = get_current_step(profile)
@@ -154,7 +167,11 @@ async def quiz_back(
     bot: Bot,
     session: AsyncSession,
 ):
-    user = await session.get(User, call.from_user.id)
+    await get_or_create_user(
+        session=session,
+        telegram_id=call.from_user.id,
+        username=call.from_user.username,
+    )
     profile = await get_or_create_quiz_profile(session, user)
 
     await go_back(session, profile)

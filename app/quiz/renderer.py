@@ -17,7 +17,7 @@ def build_keyboard(
     buttons = []
 
     for option_key, option in step["options"].items():
-        text = option["text"]
+        text = option["button"]
         if selected == option_key:
             text = f"✅ {text}"
 
@@ -54,12 +54,15 @@ def build_keyboard(
 
 # Определяем фото и текст
 def resolve_media(step: dict, selected: str | None):
-    if selected and "preview" in step["options"][selected]:
-        media = step["options"][selected]["preview"]
-    else:
-        media = step["default"]
+    # если выбран вариант и у него есть preview — показываем его
+    if selected:
+        option = step["options"].get(selected)
+        if option and "preview" in option:
+            return option["preview"]["photo"], option["preview"]["text"]
 
-    return media["photo"], media["text"]
+    # иначе — базовое фото и текст шага
+    return step["photo"], step["text"]
+
 
 
 

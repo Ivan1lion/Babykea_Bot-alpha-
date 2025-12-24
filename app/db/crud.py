@@ -18,7 +18,7 @@ channel = int(os.getenv("CHANNEL_ID"))
                                         ###  ###  ###  Для AI и БД ###  ###  ###
 
 # Получить пользователя или создать нового + создание thread через OpenAI API
-async def get_or_create_user(session: AsyncSession, telegram_id: int, username: str,) -> User:
+async def get_or_create_user(session: AsyncSession, telegram_id: int, username: str | None,) -> User:
     # Проверка: есть ли пользователь
     result = await session.execute(select(User).where(User.telegram_id == telegram_id))
     user = result.scalar_one_or_none()

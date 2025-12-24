@@ -1,45 +1,52 @@
 QUIZ_CONFIG = {
+
     # =========================
     # Уровень 1 - корень квиза
     # =========================
     "root": {
-        "level": 1,
-        "photo": "AgACAgIAAxkDAAIvmWlL8xkbwYjDdjiB46Pr6ZzPR3WIAALMEGsb1_tgSsoFcdev5MQdAQADAgADeAADNgQ",
-        "text": "Выберите верное утверждение:\n1. Я в положении 🤰\n2. Ищу прогулочную коляску 6+\n3. Коляска уже есть",
-        "options": {
-            "pregnant": {
-                "button": "🤰 Я в положении",
-                "preview": {
-                    "photo": "AgACAgIAAxkDAAIvmmlL8xnBEHDg1biLDPTtKlHrDdlCAALNEGsb1_tgSkirvkvmJOW5AQADAgADeAADNgQ",
-                    "text": "Коляски для новорожденных..."
+        1: {
+            "photo": "AgACAgIAAxkDAAIvmWlL8xkbwYjDdjiB46Pr6ZzPR3WIAALMEGsb1_tgSsoFcdev5MQdAQADAgADeAADNgQ",
+            "text": (
+                "Выберите верное утверждение:\n"
+                "1. Я в положении 🤰\n"
+                "2. Ищу прогулочную коляску 6+\n"
+                "3. Коляска уже есть"
+            ),
+            "options": {
+                "pregnant": {
+                    "button": "🤰 Я в положении",
+                    "preview": {
+                        "photo": "AgACAgIAAxkDAAIvmmlL8xnBEHDg1biLDPTtKlHrDdlCAALNEGsb1_tgSkirvkvmJOW5AQADAgADeAADNgQ",
+                        "text": "Коляски для новорожденных..."
+                    },
+                    "branch": "pregnant",
+                    "save": {"user_type": "group_1"}
                 },
-                "branch": "pregnant",
-                "save": {"user_type": "group_1"}
-            },
-            "stroller_6_plus": {
-                "button": "👶 Прогулочная коляска 6+",
-                "preview": {
-                    "photo": "AgACAgIAAxkDAAIvm2lL8xqvOFcn_7scId5LT3hOdo_UAALOEGsb1_tgShr-ys5-yc8iAQADAgADeAADNgQ",
-                    "text": "Коляски для детей от 6 мес..."
+                "stroller_6_plus": {
+                    "button": "👶 Прогулочная коляска 6+",
+                    "preview": {
+                        "photo": "AgACAgIAAxkDAAIvm2lL8xqvOFcn_7scId5LT3hOdo_UAALOEGsb1_tgShr-ys5-yc8iAQADAgADeAADNgQ",
+                        "text": "Коляски для детей от 6 мес..."
+                    },
+                    "branch": "stroller_6_plus",
+                    "save": {"user_type": "group_2"}
                 },
-                "branch": "stroller_6_plus",
-                "save": {"user_type": "group_2"}
-            },
-            "service_only": {
-                "button": "🛠 Коляска уже есть",
-                "preview": {
-                    "photo": "AgACAgIAAxkDAAIvnGlL8xoRVyhRVDvdLMjqgSWdDckUAALPEGsb1_tgSlgghJESMgyvAQADAgADeAADNgQ",
-                    "text": "Обслуживание колясок..."
+                "service_only": {
+                    "button": "🛠 Коляска уже есть",
+                    "preview": {
+                        "photo": "AgACAgIAAxkDAAIvnGlL8xoRVyhRVDvdLMjqgSWdDckUAALPEGsb1_tgSlgghJESMgyvAQADAgADeAADNgQ",
+                        "text": "Обслуживание колясок..."
+                    },
+                    "branch": "service_only",
+                    "save": {"user_type": "group_2"}
                 },
-                "branch": "service_only",
-                "save": {"user_type": "group_2"}
             },
-        },
-        "next_level": 2
+            "next_level": 2
+        }
     },
 
     # =========================
-    # Ветвь "pregnant" (от рождения до 6 мес.)
+    # Ветвь "pregnant"
     # =========================
     "pregnant": {
         2: {
@@ -86,7 +93,7 @@ QUIZ_CONFIG = {
                     "save": {"frame_material": "steel"}
                 }
             },
-            "next_level": None  # Конец квиза для этой ветки
+            "next_level": None
         }
     },
 
