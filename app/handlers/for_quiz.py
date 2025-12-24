@@ -40,6 +40,22 @@ async def quiz_start(
     session.add(profile)
     await session.commit()
 
+    # # Удаляем предыдущее сообщение с видео и кнопкой (если нужно)
+    # try:
+    #     await bot.delete_message(chat_id=call.message.chat.id, message_id=call.message.message_id)
+    # except Exception as e:
+    #     print(f"Не удалось удалить старое сообщение: {e}")
+
+    # Убираем кнопки из старого видео
+    try:
+        await bot.edit_message_reply_markup(
+            chat_id=call.message.chat.id,
+            message_id=call.message.message_id,
+            reply_markup=None
+        )
+    except Exception as e:
+        print(f"Не удалось убрать кнопки с видео: {e}")
+
     # Первый шаг — отправляем фото-квиз заново
     step = get_current_step(profile)
     photo, text = resolve_media(step, None)
