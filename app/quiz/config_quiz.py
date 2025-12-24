@@ -1,73 +1,174 @@
 QUIZ_CONFIG = {
-    "start": {
+    # =========================
+    # Уровень 1 - корень квиза
+    # =========================
+    "root": {
         "level": 1,
-        "photo": "photo_1",
-        "text": "Выберите верное утверждение:",
+        "photo": "AgACAgIAAxkDAAIvmWlL8xkbwYjDdjiB46Pr6ZzPR3WIAALMEGsb1_tgSsoFcdev5MQdAQADAgADeAADNgQ",
+        "text": "Выберите верное утверждение:\n1. Я в положении 🤰\n2. Ищу прогулочную коляску 6+\n3. Коляска уже есть",
         "options": {
             "pregnant": {
                 "button": "🤰 Я в положении",
                 "preview": {
-                    "photo": "photo_2",
+                    "photo": "AgACAgIAAxkDAAIvmmlL8xnBEHDg1biLDPTtKlHrDdlCAALNEGsb1_tgSkirvkvmJOW5AQADAgADeAADNgQ",
                     "text": "Коляски для новорожденных..."
                 },
                 "branch": "pregnant",
-                "save": {
-                    "user_type": "group_1"
-                }
+                "save": {"user_type": "group_1"}
             },
             "stroller_6_plus": {
                 "button": "👶 Прогулочная коляска 6+",
                 "preview": {
-                    "photo": "photo_3",
+                    "photo": "AgACAgIAAxkDAAIvm2lL8xqvOFcn_7scId5LT3hOdo_UAALOEGsb1_tgShr-ys5-yc8iAQADAgADeAADNgQ",
                     "text": "Коляски для детей от 6 мес..."
                 },
                 "branch": "stroller_6_plus",
-                "save": {
-                    "user_type": "group_2"
-                }
+                "save": {"user_type": "group_2"}
             },
             "service_only": {
                 "button": "🛠 Коляска уже есть",
                 "preview": {
-                    "photo": "photo_4",
+                    "photo": "AgACAgIAAxkDAAIvnGlL8xoRVyhRVDvdLMjqgSWdDckUAALPEGsb1_tgSlgghJESMgyvAQADAgADeAADNgQ",
                     "text": "Обслуживание колясок..."
                 },
                 "branch": "service_only",
-                "save": {
-                    "user_type": "group_2"
-                }
+                "save": {"user_type": "group_2"}
             },
         },
         "next_level": 2
     },
 
+    # =========================
+    # Ветвь "pregnant" (от рождения до 6 мес.)
+    # =========================
     "pregnant": {
         2: {
-            "photo": "photo_5",
+            "photo": "AgACAgIAAxkDAAIvnWlL8xu3FXKFt7ZI7VYf_ELL5NSvAALQEGsb1_tgSi_3x88-tK7ZAQADAgADeAADNgQ",
             "text": "Сфера применения коляски",
             "options": {
                 "daily": {
                     "button": "Для ежедневных прогулок",
                     "preview": {
-                        "photo": "photo_6",
+                        "photo": "AgACAgIAAxkDAAIvnmlL8xvfT3zuXadTqTSCUbFCvKkdAALREGsb1_tgSt86pm6tU0c5AQADAgADeAADNgQ",
                         "text": "Для ежедневных прогулок"
                     },
-                    "save": {
-                        "usage": "daily_walks"
-                    }
+                    "save": {"usage": "daily_walks"}
                 },
                 "travel": {
                     "button": "Для путешествий",
                     "preview": {
-                        "photo": "photo_7",
-                        "text": "Для перелётов"
+                        "photo": "AgACAgIAAxkDAAIus2k68byaLEcNeXiZsfXMXnhQbSBcAAKsDmsbJVXYSeDlaQGnyy-ZAQADAgADeQADNg",
+                        "text": "Для перелётов, коляски компактные"
                     },
-                    "save": {
-                        "usage": "travel"
-                    }
+                    "save": {"usage": "travel"}
                 }
             },
             "next_level": 3
+        },
+        3: {
+            "photo": "media/photo_8.jpg",
+            "text": "Выберите материал коляски",
+            "options": {
+                "aluminum": {
+                    "button": "Алюминий",
+                    "preview": {
+                        "photo": "media/photo_9.jpg",
+                        "text": "Коляска с алюминиевой рамой"
+                    },
+                    "save": {"frame_material": "aluminum"}
+                },
+                "steel": {
+                    "button": "Сталь",
+                    "preview": {
+                        "photo": "media/photo_10.jpg",
+                        "text": "Коляска со стальной рамой"
+                    },
+                    "save": {"frame_material": "steel"}
+                }
+            },
+            "next_level": None  # Конец квиза для этой ветки
+        }
+    },
+
+    # =========================
+    # Ветвь "stroller_6_plus" (6+ мес.)
+    # =========================
+    "stroller_6_plus": {
+        2: {
+            "photo": "media/photo_11.jpg",
+            "text": "Тип прогулочной коляски",
+            "options": {
+                "compact": {
+                    "button": "Компактная",
+                    "preview": {
+                        "photo": "media/photo_12.jpg",
+                        "text": "Легкая и удобная для города"
+                    },
+                    "save": {"stroller_type": "compact"}
+                },
+                "all_terrain": {
+                    "button": "Всё проходимая",
+                    "preview": {
+                        "photo": "media/photo_13.jpg",
+                        "text": "Для прогулок по разным покрытиям"
+                    },
+                    "save": {"stroller_type": "all_terrain"}
+                }
+            },
+            "next_level": 3
+        },
+        3: {
+            "photo": "media/photo_14.jpg",
+            "text": "Выберите цвет коляски",
+            "options": {
+                "red": {
+                    "button": "Красная",
+                    "preview": {
+                        "photo": "media/photo_15.jpg",
+                        "text": "Красная коляска"
+                    },
+                    "save": {"color": "red"}
+                },
+                "blue": {
+                    "button": "Синяя",
+                    "preview": {
+                        "photo": "media/photo_16.jpg",
+                        "text": "Синяя коляска"
+                    },
+                    "save": {"color": "blue"}
+                }
+            },
+            "next_level": None
+        }
+    },
+
+    # =========================
+    # Ветвь "service_only" (уже есть коляска)
+    # =========================
+    "service_only": {
+        2: {
+            "photo": "media/photo_17.jpg",
+            "text": "Интересует обслуживание",
+            "options": {
+                "cleaning": {
+                    "button": "Чистка и уход",
+                    "preview": {
+                        "photo": "media/photo_18.jpg",
+                        "text": "Регулярная чистка коляски"
+                    },
+                    "save": {"service_type": "cleaning"}
+                },
+                "repair": {
+                    "button": "Ремонт",
+                    "preview": {
+                        "photo": "media/photo_19.jpg",
+                        "text": "Ремонт механизма и рамы"
+                    },
+                    "save": {"service_type": "repair"}
+                }
+            },
+            "next_level": None
         }
     }
 }
+

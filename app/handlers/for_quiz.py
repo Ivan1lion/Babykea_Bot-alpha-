@@ -118,6 +118,19 @@ async def quiz_next(
     session.add(profile)
     await session.commit()
 
+    # 🏁 КВИЗ ЗАВЕРШЁН
+    if profile.completed:
+        await call.message.edit_caption(
+            caption=(
+                "✅ Спасибо! Квиз завершён.\n\n"
+                "Я сохранил ваши ответы и скоро помогу "
+                "подобрать подходящую коляску 👶🛒"
+            ),
+            reply_markup=None,
+        )
+        return
+
+    # иначе — обычный переход
     await render_quiz_step(
         bot=bot,
         chat_id=call.message.chat.id,

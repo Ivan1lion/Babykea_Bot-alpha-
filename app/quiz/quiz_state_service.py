@@ -42,6 +42,14 @@ def get_current_step(profile: UserQuizProfile) -> dict:
 
 
 
+# Проверка окончания квиза
+def is_last_step(profile: UserQuizProfile) -> bool:
+    branch = profile.branch or "root"
+    steps = QUIZ_CONFIG.get(branch, {})
+    return profile.current_level not in steps
+
+
+
 
 #Проверка: можно ли нажать «Далее»
 def validate_next(selected_option: str | None) -> bool:
@@ -70,6 +78,10 @@ async def save_and_next(
         profile.branch = selected_option
 
     profile.current_level += 1
+
+    # ⬇️ ПРОВЕРКА ЗАВЕРШЕНИЯ КВИЗА
+    if is_last_step(profile):
+        profile.completed = True
 
     session.add(profile)
     await session.commit()
