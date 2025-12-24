@@ -1,8 +1,10 @@
 from aiogram import Bot
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.exceptions import TelegramBadRequest
 
 from app.quiz.config_quiz import QUIZ_CONFIG
 from app.db.models import UserQuizProfile
+import app.handlers.keyboards as kb
 
 
 
@@ -70,20 +72,32 @@ async def render_quiz_step(
     profile: UserQuizProfile,
     selected: str | None = None,
 ):
-    branch = profile.branch or "root"
-    step = QUIZ_CONFIG[branch][profile.current_level]
+    try:
+        branch = profile.branch or "root"
+        step = QUIZ_CONFIG[branch][profile.current_level]
 
-    photo, text = resolve_media(step, selected)
-    keyboard = build_keyboard(step, selected)
+        photo, text = resolve_media(step, selected)
+        keyboard = build_keyboard(step, selected)
 
-    await bot.edit_message_media(
-        chat_id=chat_id,
-        message_id=message_id,
-        media={
-            "type": "photo",
-            "media": photo,
-            "caption": text
-        },
-        reply_markup=keyboard
-    )
+        await bot.edit_message_media(
+            chat_id=chat_id,
+            message_id=message_id,
+            media={
+                "type": "photo",
+                "media": photo,
+                "caption": text,
+            },
+            reply_markup=keyboard,
+        )
+
+    except TelegramBadRequest:
+        # ❌ сообщение не найдено / нельзя отредактировать
+        await bot.send_message(
+            chat_id=chat_id,
+            text=(
+                "❌ Произошла ошибка.\n\n"
+                "Попробуйте ещё раз — нажмите кнопку ниже 👇"
+            ),
+            reply_markup=kb.quiz_false,
+        )
 

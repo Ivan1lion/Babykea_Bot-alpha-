@@ -4,6 +4,9 @@ from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 quiz_start = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="Далее 👉",
                                                                          callback_data="quiz:start")]])
 
+quiz_false = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="🔄 Перезапуск",
+                                                                         callback_data="quiz:start")]])
+
 user_group = InlineKeyboardMarkup(inline_keyboard=[
     [InlineKeyboardButton(text="1 🤰", callback_data="pay30"),
      InlineKeyboardButton(text="2 👶", callback_data="pay550")],

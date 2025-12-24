@@ -97,6 +97,7 @@ class UserQuizProfile(Base):
 
 
 
+
 #4 Таблица для постинга. Каналы магазинов (2+ на магазин)
 class MagazineChannel(Base):
     __tablename__ = "magazine_channels"

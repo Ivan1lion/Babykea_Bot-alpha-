@@ -30,6 +30,11 @@ async def quiz_start(
     user = await session.get(User, call.from_user.id)
     profile = await get_or_create_quiz_profile(session, user)
 
+    # ⚠️ очищаем только временный выбор (на случай если юзер решит заново пройти квиз)
+    profile.data.pop("_selected", None)
+    session.add(profile)
+    await session.commit()
+
     await render_quiz_step(
         bot=bot,
         chat_id=call.message.chat.id,
