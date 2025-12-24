@@ -15,7 +15,7 @@ client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 channel = int(os.getenv("CHANNEL_ID"))
 
 
-                                        ###  ###  ###  Для AI  ###  ###  ###
+                                        ###  ###  ###  Для AI и БД ###  ###  ###
 
 # Получить пользователя или создать нового + создание thread через OpenAI API
 async def get_or_create_user(session: AsyncSession, telegram_id: int, username: str,) -> User:

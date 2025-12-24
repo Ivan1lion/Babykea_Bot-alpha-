@@ -1,7 +1,8 @@
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 from sqlalchemy.ext.asyncio import AsyncAttrs
 from sqlalchemy.sql import func
-from sqlalchemy import BigInteger, Integer, String, DateTime, ForeignKey, UniqueConstraint
+from sqlalchemy import BigInteger, Integer, String, DateTime, ForeignKey, Boolean
+from sqlalchemy.dialects.postgresql import JSONB
 from typing import Optional
 
 
@@ -57,8 +58,46 @@ class User(Base):
 
 
 
+#3 Профиль прохождения квиза пользователя
+class UserQuizProfile(Base):
+    __tablename__ = "user_quiz_profiles"
 
-#3 Таблица для постинга. Каналы магазинов (2+ на магазин)
+    id: Mapped[int] = mapped_column(primary_key=True)
+
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"),
+        unique=True,
+        nullable=False,
+        index=True,
+    )
+
+    branch: Mapped[str | None] = mapped_column(
+        String(50),
+        nullable=True,
+    )
+
+    current_level: Mapped[int] = mapped_column(
+        Integer,
+        default=1,
+        nullable=False,
+    )
+
+    data: Mapped[dict] = mapped_column(
+        JSONB,
+        default=dict,
+        nullable=False,
+    )
+
+    completed: Mapped[bool] = mapped_column(
+        Boolean,
+        default=False,
+        nullable=False,
+    )
+
+
+
+
+#4 Таблица для постинга. Каналы магазинов (2+ на магазин)
 class MagazineChannel(Base):
     __tablename__ = "magazine_channels"
 
@@ -70,7 +109,8 @@ class MagazineChannel(Base):
 
 
 
-#4 Таблица для постинга. Посты из каналов магазинов (журнал)
+
+#5 Таблица для постинга. Посты из каналов магазинов
 class ChannelState(Base):
     __tablename__ = "channel_states"
 
@@ -82,7 +122,7 @@ class ChannelState(Base):
 
 
 
-#5 Таблица для постинга из МОЕГО ЛИЧНОГО канала. Сдесь будет id моего канала
+#6 Таблица для постинга из МОЕГО ЛИЧНОГО канала. Сдесь будет id моего канала
 class MyChannel(Base):
     __tablename__ = "my_channels"
 
@@ -98,7 +138,8 @@ class MyChannel(Base):
 
 
 
-#6Таблица номеров ПОСТОВ из МОЕГО ЛИЧНОГО канала. Сдесь будет id моего последнего поста
+
+#7 Таблица номеров ПОСТОВ из МОЕГО ЛИЧНОГО канала. Сдесь будет id моего последнего поста
 class MyPost(Base):
     __tablename__ = "my_posts"
 
