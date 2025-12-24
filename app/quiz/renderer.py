@@ -6,7 +6,6 @@ from app.db.models import UserQuizProfile
 
 
 
-
 # Сбор клавиатуры под шаг
 def build_keyboard(
     step: dict,
