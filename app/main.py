@@ -17,6 +17,7 @@ from app.db.config import create_db, drop_db, session_maker
 from app.db.crud import notify_pending_users
 from app.middlewares.db_session import DataBaseSession
 from app.handlers.for_user import for_user_router
+from app.handlers.for_quiz import quiz_router
 from app.comands_menu.bot_menu_cmds import bot_menu, menu_cmds_router
 from app.posting.queue import start_sender
 # from app.openai_assistant.queue import OpenAIRequestQueue
@@ -32,6 +33,7 @@ dp = Dispatcher(storage=storage)
 
 dp.include_router(for_user_router)
 dp.include_router(menu_cmds_router)
+dp.include_router(quiz_router)
 
 
 # openai_queue: OpenAIRequestQueue | None = None
@@ -64,7 +66,7 @@ async def on_startup(dispatcher: Dispatcher):
     await bot.set_my_short_description(short_description=f"Сервис по подбору (поиску) детских колясок. Разработан "
                                                          f"для молодых родителей"
                                                          f"\n\nadmin: @RomanMo_admin")
-    # await drop_db() # удаление Базы Данных
+    await drop_db() # удаление Базы Данных
     await create_db() # создание Базы Данных
     asyncio.create_task(start_sender(bot)) # 🔹 запуск очереди рассылки (ВАЖНО)
     # global openai_queue

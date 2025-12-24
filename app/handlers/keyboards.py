@@ -1,8 +1,8 @@
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 
-user_type = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="Далее 👉",
-                                                                         callback_data="user_type")]])
+quiz_start = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="Далее 👉",
+                                                                         callback_data="quiz:start")]])
 
 user_group = InlineKeyboardMarkup(inline_keyboard=[
     [InlineKeyboardButton(text="1 🤰", callback_data="pay30"),
