@@ -3,6 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncAttrs
 from sqlalchemy.sql import func
 from sqlalchemy import BigInteger, Integer, String, DateTime, ForeignKey, Boolean
 from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.ext.mutable import MutableDict
 from typing import Optional
 
 
@@ -82,11 +83,7 @@ class UserQuizProfile(Base):
         nullable=False,
     )
 
-    data: Mapped[dict] = mapped_column(
-        JSONB,
-        default=dict,
-        nullable=False,
-    )
+    data = mapped_column(MutableDict.as_mutable(JSONB), default=dict)
 
     completed: Mapped[bool] = mapped_column(
         Boolean,

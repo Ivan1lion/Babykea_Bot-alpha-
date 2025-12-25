@@ -91,13 +91,13 @@ async def quiz_select_option(
     selected_option = call.data.split(":")[2]
 
     user = await get_or_create_user(
-    session=session,
-    telegram_id=call.from_user.id,
-    username=call.from_user.username,
-)
+        session=session,
+        telegram_id=call.from_user.id,
+        username=call.from_user.username,
+    )
     profile = await get_or_create_quiz_profile(session, user)
 
-    # временно сохраняем выбор
+    # 🔹 ТОЛЬКО временный выбор
     profile.data["_selected"] = selected_option
     session.add(profile)
     await session.commit()

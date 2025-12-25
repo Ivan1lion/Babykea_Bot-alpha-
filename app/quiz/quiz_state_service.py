@@ -1,4 +1,5 @@
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 
 from app.db.models import UserQuizProfile, User
 from app.quiz.config_quiz import QUIZ_CONFIG
@@ -9,8 +10,10 @@ async def get_or_create_quiz_profile(
     session: AsyncSession,
     user: User
 ) -> UserQuizProfile:
-
-    profile = await session.get(UserQuizProfile, user.id)
+    result = await session.execute(
+        select(UserQuizProfile).where(UserQuizProfile.user_id == user.id)
+    )
+    profile = result.scalar_one_or_none()
 
     if profile:
         return profile
@@ -19,7 +22,8 @@ async def get_or_create_quiz_profile(
         user_id=user.id,
         branch=None,
         current_level=1,
-        data={}
+        data={},
+        completed=False,
     )
     session.add(profile)
     await session.commit()
@@ -68,19 +72,26 @@ async def save_and_next(
     step: dict,
     selected_option: str,
 ):
-    key = step["save_to"]
-    value = step["options"][selected_option]["value"]
+    option = step["options"].get(selected_option)
+    if not option:
+        return
 
-    profile.data[key] = value
+    # 🔹 сохраняем реальные ответы
+    save_data = option.get("save", {})
+    profile.data.update(save_data)
 
-    # если первый шаг — выбираем ветку
-    if step.get("branch_by"):
-        profile.branch = selected_option
+    # 🔹 ВЕТКА — ТОЛЬКО ЗДЕСЬ
+    if "branch" in option:
+        profile.branch = option["branch"]
+        profile.current_level = 2
+    else:
+        profile.current_level = step.get("next_level")
 
-    profile.current_level += 1
+    # 🔹 очистка временного выбора
+    profile.data.pop("_selected", None)
 
-    # ⬇️ ПРОВЕРКА ЗАВЕРШЕНИЯ КВИЗА
-    if is_last_step(profile):
+    # 🔹 Провекрка ЗАВЕРШЕНИЯ квиза, если next_level = None → конец квиза
+    if profile.current_level is None:
         profile.completed = True
 
     session.add(profile)
