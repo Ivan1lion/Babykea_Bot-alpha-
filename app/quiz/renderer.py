@@ -11,6 +11,7 @@ import app.handlers.keyboards as kb
 # Сбор клавиатуры под шаг
 def build_keyboard(
     step: dict,
+    profile,
     selected: str | None = None,
 ) -> InlineKeyboardMarkup:
 
@@ -30,7 +31,8 @@ def build_keyboard(
 
     nav = []
 
-    if step.get("has_back"):
+    # ⬅ Назад — если уровень больше 1
+    if profile.current_level > 1:
         nav.append(
             InlineKeyboardButton(
                 text="⬅ Назад",
@@ -48,6 +50,7 @@ def build_keyboard(
     buttons.append(nav)
 
     return InlineKeyboardMarkup(inline_keyboard=buttons)
+
 
 
 
@@ -80,7 +83,7 @@ async def render_quiz_step(
         step = QUIZ_CONFIG[branch][profile.current_level]
 
         photo, text = resolve_media(step, selected)
-        keyboard = build_keyboard(step, selected)
+        keyboard = build_keyboard(step, profile, selected)
 
         await bot.edit_message_media(
             chat_id=chat_id,

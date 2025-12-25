@@ -64,7 +64,7 @@ async def quiz_start(
         chat_id=call.message.chat.id,
         photo=photo,
         caption=text,
-        reply_markup=build_keyboard(step, None)
+        reply_markup=build_keyboard(step, profile, None)
     )
 
     # сохраняем message_id нового фото-сообщения для редактирования
@@ -192,7 +192,7 @@ async def quiz_back(
     session: AsyncSession,
 ):
     await call.answer()
-    await get_or_create_user(
+    user = await get_or_create_user(
         session=session,
         telegram_id=call.from_user.id,
         username=call.from_user.username,

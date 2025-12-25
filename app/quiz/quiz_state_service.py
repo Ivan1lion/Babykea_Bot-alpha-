@@ -101,22 +101,31 @@ async def save_and_next(
 
 
 # Назад (шаг –1)
-async def go_back(
-    session: AsyncSession,
-    profile: UserQuizProfile,
-):
-    if profile.current_level == 1:
+async def go_back(session: AsyncSession, profile: UserQuizProfile):
+    if profile.current_level == 1 and profile.branch is None:
+        # Уже на самом первом шаге root — дальше не откатываем
         return
 
     profile.current_level -= 1
 
-    step = get_current_step(profile)
-    key = step["save_to"]
+    branch = profile.branch or "root"
 
-    profile.data.pop(key, None)
+    # Если уровня нет в ветке, возвращаемся в root
+    if profile.current_level not in QUIZ_CONFIG.get(branch, {}):
+        profile.branch = None
+        profile.current_level = 1
+        step = QUIZ_CONFIG["root"][1]
+    else:
+        step = QUIZ_CONFIG[branch][profile.current_level]
+
+    # Удаляем сохранённое значение текущего шага (если есть)
+    key = step.get("save_to")
+    if key:
+        profile.data.pop(key, None)
 
     session.add(profile)
     await session.commit()
+
 
 
 
