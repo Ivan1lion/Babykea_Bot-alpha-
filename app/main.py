@@ -50,7 +50,7 @@ dp.include_router(quiz_router)
 
 
 async def on_startup(dispatcher: Dispatcher):
-    print("GO bd")
+    print("Bot started")
     # await bot.set_webhook(
     #     url=WEBHOOK_URL,
     #     drop_pending_updates=True,
@@ -66,8 +66,8 @@ async def on_startup(dispatcher: Dispatcher):
     await bot.set_my_short_description(short_description=f"Сервис по подбору (поиску) детских колясок. Разработан "
                                                          f"для молодых родителей"
                                                          f"\n\nadmin: @RomanMo_admin")
-    await drop_db() # удаление Базы Данных
-    await create_db() # создание Базы Данных
+    # await drop_db() # удаление Базы Данных
+    # await create_db() # создание Базы Данных
     asyncio.create_task(start_sender(bot)) # 🔹 запуск очереди рассылки (ВАЖНО)
     # global openai_queue
     # openai_queue = OpenAIRequestQueue()

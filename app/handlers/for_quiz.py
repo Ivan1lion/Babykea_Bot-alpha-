@@ -28,6 +28,7 @@ async def quiz_start(
     bot: Bot,
     session: AsyncSession,
 ):
+    await call.answer("Один момент")
     user = await get_or_create_user(
         session=session,
         telegram_id=call.from_user.id,
@@ -190,6 +191,7 @@ async def quiz_back(
     bot: Bot,
     session: AsyncSession,
 ):
+    await call.answer()
     await get_or_create_user(
         session=session,
         telegram_id=call.from_user.id,
