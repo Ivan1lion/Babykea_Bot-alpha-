@@ -42,7 +42,7 @@ def build_keyboard(
 
     nav.append(
         InlineKeyboardButton(
-            text="➡ Далее",
+            text="Далее ➡",
             callback_data="quiz:next"
         )
     )

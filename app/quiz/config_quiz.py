@@ -7,14 +7,14 @@ QUIZ_CONFIG = {
         1: {
             "photo": "AgACAgIAAxkDAAIvmWlL8xkbwYjDdjiB46Pr6ZzPR3WIAALMEGsb1_tgSsoFcdev5MQdAQADAgADeAADNgQ",
             "text": (
-                "Выберите верное утверждение:\n"
-                "1. Я в положении 🤰\n"
-                "2. Ищу прогулочную коляску 6+\n"
-                "3. Коляска уже есть"
+                "Выберите верное утверждение:\n\n"
+                "<blockquote>1. Я в положении. Ищу коляску для новорожденного 🤰</blockquote>\n"
+                "или\n"
+                "<blockquote>2. Ищу прогулочную коляску 6+ 👶</blockquote>"
             ),
             "options": {
                 "pregnant": {
-                    "button": "🤰 Я в положении",
+                    "button": "Я в положении",
                     "preview": {
                         "photo": "AgACAgIAAxkDAAIvmmlL8xnBEHDg1biLDPTtKlHrDdlCAALNEGsb1_tgSkirvkvmJOW5AQADAgADeAADNgQ",
                         "text": "Коляски для новорожденных..."
@@ -23,7 +23,7 @@ QUIZ_CONFIG = {
                     "save": {"user_type": "group_1"}
                 },
                 "stroller_6_plus": {
-                    "button": "👶 Прогулочная коляска 6+",
+                    "button": "Прогулочная коляска 6+",
                     "preview": {
                         "photo": "AgACAgIAAxkDAAIvm2lL8xqvOFcn_7scId5LT3hOdo_UAALOEGsb1_tgShr-ys5-yc8iAQADAgADeAADNgQ",
                         "text": "Коляски для детей от 6 мес..."
@@ -31,15 +31,15 @@ QUIZ_CONFIG = {
                     "branch": "stroller_6_plus",
                     "save": {"user_type": "group_2"}
                 },
-                "service_only": {
-                    "button": "🛠 Коляска уже есть",
-                    "preview": {
-                        "photo": "AgACAgIAAxkDAAIvnGlL8xoRVyhRVDvdLMjqgSWdDckUAALPEGsb1_tgSlgghJESMgyvAQADAgADeAADNgQ",
-                        "text": "Обслуживание колясок..."
-                    },
-                    "branch": "service_only",
-                    "save": {"user_type": "group_2"}
-                },
+                # "service_only": {
+                #     "button": "Коляска уже есть",
+                #     "preview": {
+                #         "photo": "AgACAgIAAxkDAAIvnGlL8xoRVyhRVDvdLMjqgSWdDckUAALPEGsb1_tgSlgghJESMgyvAQADAgADeAADNgQ",
+                #         "text": "Обслуживание колясок..."
+                #     },
+                #     "branch": "service_only",
+                #     "save": {"user_type": "group_2"}
+                # },
             },
             "next_level": 2
         }
@@ -73,13 +73,13 @@ QUIZ_CONFIG = {
             "next_level": 3
         },
         3: {
-            "photo": "media/photo_8.jpg",
+            "photo": "AgACAgIAAxkDAAIvmWlL8xkbwYjDdjiB46Pr6ZzPR3WIAALMEGsb1_tgSsoFcdev5MQdAQADAgADeAADNgQ",
             "text": "Выберите материал коляски",
             "options": {
                 "aluminum": {
                     "button": "Алюминий",
                     "preview": {
-                        "photo": "media/photo_9.jpg",
+                        "photo": "AgACAgIAAxkDAAIvmmlL8xnBEHDg1biLDPTtKlHrDdlCAALNEGsb1_tgSkirvkvmJOW5AQADAgADeAADNgQ",
                         "text": "Коляска с алюминиевой рамой"
                     },
                     "save": {"frame_material": "aluminum"}
@@ -87,7 +87,7 @@ QUIZ_CONFIG = {
                 "steel": {
                     "button": "Сталь",
                     "preview": {
-                        "photo": "media/photo_10.jpg",
+                        "photo": "AgACAgIAAxkDAAIvm2lL8xqvOFcn_7scId5LT3hOdo_UAALOEGsb1_tgShr-ys5-yc8iAQADAgADeAADNgQ",
                         "text": "Коляска со стальной рамой"
                     },
                     "save": {"frame_material": "steel"}
@@ -102,13 +102,13 @@ QUIZ_CONFIG = {
     # =========================
     "stroller_6_plus": {
         2: {
-            "photo": "media/photo_11.jpg",
+            "photo": "AgACAgIAAxkDAAIvm2lL8xqvOFcn_7scId5LT3hOdo_UAALOEGsb1_tgShr-ys5-yc8iAQADAgADeAADNgQ",
             "text": "Тип прогулочной коляски",
             "options": {
                 "compact": {
                     "button": "Компактная",
                     "preview": {
-                        "photo": "media/photo_12.jpg",
+                        "photo": "AgACAgIAAxkDAAIvm2lL8xqvOFcn_7scId5LT3hOdo_UAALOEGsb1_tgShr-ys5-yc8iAQADAgADeAADNgQ",
                         "text": "Легкая и удобная для города"
                     },
                     "save": {"stroller_type": "compact"}
@@ -116,7 +116,7 @@ QUIZ_CONFIG = {
                 "all_terrain": {
                     "button": "Всё проходимая",
                     "preview": {
-                        "photo": "media/photo_13.jpg",
+                        "photo": "AgACAgIAAxkDAAIvm2lL8xqvOFcn_7scId5LT3hOdo_UAALOEGsb1_tgShr-ys5-yc8iAQADAgADeAADNgQ",
                         "text": "Для прогулок по разным покрытиям"
                     },
                     "save": {"stroller_type": "all_terrain"}
@@ -125,13 +125,13 @@ QUIZ_CONFIG = {
             "next_level": 3
         },
         3: {
-            "photo": "media/photo_14.jpg",
+            "photo": "AgACAgIAAxkDAAIvm2lL8xqvOFcn_7scId5LT3hOdo_UAALOEGsb1_tgShr-ys5-yc8iAQADAgADeAADNgQ",
             "text": "Выберите цвет коляски",
             "options": {
                 "red": {
                     "button": "Красная",
                     "preview": {
-                        "photo": "media/photo_15.jpg",
+                        "photo": "AgACAgIAAxkDAAIvm2lL8xqvOFcn_7scId5LT3hOdo_UAALOEGsb1_tgShr-ys5-yc8iAQADAgADeAADNgQ",
                         "text": "Красная коляска"
                     },
                     "save": {"color": "red"}
@@ -139,7 +139,7 @@ QUIZ_CONFIG = {
                 "blue": {
                     "button": "Синяя",
                     "preview": {
-                        "photo": "media/photo_16.jpg",
+                        "photo": "AgACAgIAAxkDAAIvm2lL8xqvOFcn_7scId5LT3hOdo_UAALOEGsb1_tgShr-ys5-yc8iAQADAgADeAADNgQ",
                         "text": "Синяя коляска"
                     },
                     "save": {"color": "blue"}
@@ -154,13 +154,13 @@ QUIZ_CONFIG = {
     # =========================
     "service_only": {
         2: {
-            "photo": "media/photo_17.jpg",
+            "photo": "AgACAgIAAxkDAAIvmmlL8xnBEHDg1biLDPTtKlHrDdlCAALNEGsb1_tgSkirvkvmJOW5AQADAgADeAADNgQ",
             "text": "Интересует обслуживание",
             "options": {
                 "cleaning": {
                     "button": "Чистка и уход",
                     "preview": {
-                        "photo": "media/photo_18.jpg",
+                        "photo": "AgACAgIAAxkDAAIvmmlL8xnBEHDg1biLDPTtKlHrDdlCAALNEGsb1_tgSkirvkvmJOW5AQADAgADeAADNgQ",
                         "text": "Регулярная чистка коляски"
                     },
                     "save": {"service_type": "cleaning"}
@@ -168,7 +168,7 @@ QUIZ_CONFIG = {
                 "repair": {
                     "button": "Ремонт",
                     "preview": {
-                        "photo": "media/photo_19.jpg",
+                        "photo": "AgACAgIAAxkDAAIvmmlL8xnBEHDg1biLDPTtKlHrDdlCAALNEGsb1_tgSkirvkvmJOW5AQADAgADeAADNgQ",
                         "text": "Ремонт механизма и рамы"
                     },
                     "save": {"service_type": "repair"}
