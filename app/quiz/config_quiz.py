@@ -8,9 +8,9 @@ QUIZ_CONFIG = {
             "photo": "AgACAgIAAxkDAAIvmWlL8xkbwYjDdjiB46Pr6ZzPR3WIAALMEGsb1_tgSsoFcdev5MQdAQADAgADeAADNgQ",
             "text": (
                 "Выберите верное утверждение:\n\n"
-                "<blockquote>1. Я в положении. Ищу коляску для новорожденного 🤰</blockquote>\n"
-                "или\n"
-                "<blockquote>2. Ищу прогулочную коляску 6+ 👶</blockquote>"
+                "<blockquote>1. Я в положении. Ищу коляску для новорожденного 🤰</blockquote>\n\n"
+                "<blockquote>2. Ищу прогулочную коляску 6+ 👶</blockquote>\n\n"
+                "<blockquote>3. Коляска уже есть</blockquote>"
             ),
             "options": {
                 "pregnant": {
@@ -31,15 +31,15 @@ QUIZ_CONFIG = {
                     "branch": "stroller_6_plus",
                     "save": {"user_type": "group_2"}
                 },
-                # "service_only": {
-                #     "button": "Коляска уже есть",
-                #     "preview": {
-                #         "photo": "AgACAgIAAxkDAAIvnGlL8xoRVyhRVDvdLMjqgSWdDckUAALPEGsb1_tgSlgghJESMgyvAQADAgADeAADNgQ",
-                #         "text": "Обслуживание колясок..."
-                #     },
-                #     "branch": "service_only",
-                #     "save": {"user_type": "group_2"}
-                # },
+                "service_only": {
+                    "button": "Коляска уже есть",
+                    "preview": {
+                        "photo": "AgACAgIAAxkDAAIvnGlL8xoRVyhRVDvdLMjqgSWdDckUAALPEGsb1_tgSlgghJESMgyvAQADAgADeAADNgQ",
+                        "text": "Обслуживание колясок..."
+                    },
+                    "branch": "service_only",
+                    "save": {"user_type": "group_2"}
+                },
             },
             "next_level": 2
         }
@@ -61,14 +61,22 @@ QUIZ_CONFIG = {
                     },
                     "save": {"usage": "daily_walks"}
                 },
+                "autolady": {
+                    "button": "Я автоледи",
+                    "preview": {
+                        "photo": "AgACAgIAAxkDAAIvnmlL8xvfT3zuXadTqTSCUbFCvKkdAALREGsb1_tgSt86pm6tU0c5AQADAgADeAADNgQ",
+                        "text": "Коляски которые более компактные что бы помещались в багажник авто"
+                    },
+                    "save": {"usage": "autolady"}
+                },
                 "travel": {
                     "button": "Для путешествий",
                     "preview": {
-                        "photo": "AgACAgIAAxkDAAIus2k68byaLEcNeXiZsfXMXnhQbSBcAAKsDmsbJVXYSeDlaQGnyy-ZAQADAgADeQADNg",
+                        "photo": "AgACAgIAAxkDAAIvnmlL8xvfT3zuXadTqTSCUbFCvKkdAALREGsb1_tgSt86pm6tU0c5AQADAgADeAADNgQ",
                         "text": "Для перелётов, коляски компактные"
                     },
                     "save": {"usage": "travel"}
-                }
+                },
             },
             "next_level": 3
         },
