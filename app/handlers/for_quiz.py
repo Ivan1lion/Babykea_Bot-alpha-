@@ -1,5 +1,6 @@
 from aiogram import Router, F, Bot
-from aiogram.types import CallbackQuery
+from aiogram.types import CallbackQuery, Message
+from aiogram.filters import Command
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import User
@@ -207,5 +208,32 @@ async def quiz_back(
         message_id=call.message.message_id,
         profile=profile,
         selected=None,
+    )
+
+
+@quiz_router.message(Command("quiz_restart"))
+async def restart_quiz_cmd(
+    message: Message,
+    bot: Bot,
+    session: AsyncSession,
+):
+    user = await get_or_create_user(session, message.from_user.id, message.from_user.username)
+    profile = await get_or_create_quiz_profile(session, user)
+
+    profile.branch = None
+    profile.current_level = 1
+    profile.completed = False
+    profile.data = {}
+
+    session.add(profile)
+    await session.commit()
+
+    step = get_current_step(profile)
+    photo, text = resolve_media(step, None)
+
+    await message.answer_photo(
+        photo=photo,
+        caption=text,
+        reply_markup=build_keyboard(step, profile, None)
     )
 

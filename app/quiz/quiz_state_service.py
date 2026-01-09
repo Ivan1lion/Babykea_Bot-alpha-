@@ -80,19 +80,22 @@ async def save_and_next(
     save_data = option.get("save", {})
     profile.data.update(save_data)
 
-    # 🔹 ВЕТКА — ТОЛЬКО ЗДЕСЬ
+
     if "branch" in option:
         profile.branch = option["branch"]
         profile.current_level = 2
     else:
-        profile.current_level = step.get("next_level")
+        next_level = step.get("next_level")
+
+        if next_level is None:
+            # 🏁 КОНЕЦ КВИЗА
+            profile.completed = True
+            # ❗ current_level НЕ ТРОГАЕМ
+        else:
+            profile.current_level = next_level
 
     # 🔹 очистка временного выбора
     profile.data.pop("_selected", None)
-
-    # 🔹 Провекрка ЗАВЕРШЕНИЯ квиза, если next_level = None → конец квиза
-    if profile.current_level is None:
-        profile.completed = True
 
     session.add(profile)
     await session.commit()

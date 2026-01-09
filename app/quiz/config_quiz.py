@@ -5,7 +5,7 @@ QUIZ_CONFIG = {
     # =========================
     "root": {
         1: {
-            "photo": "AgACAgIAAxkDAAIvmWlL8xkbwYjDdjiB46Pr6ZzPR3WIAALMEGsb1_tgSsoFcdev5MQdAQADAgADeAADNgQ",
+            "photo": "AgACAgIAAxkDAAIxHGlhIkhs6JBDHOwb-AHu0ievep85AAKQC2sbEv8QS5rKL8kjTYlEAQADAgADdwADOAQ",
             "text": (
                 "Выберите верное утверждение:\n\n"
                 "<blockquote>1. Я в положении. Ищу коляску для новорожденного 🤰</blockquote>\n\n"
@@ -16,7 +16,7 @@ QUIZ_CONFIG = {
                 "pregnant": {
                     "button": "Я в положении",
                     "preview": {
-                        "photo": "AgACAgIAAxkDAAIvmmlL8xnBEHDg1biLDPTtKlHrDdlCAALNEGsb1_tgSkirvkvmJOW5AQADAgADeAADNgQ",
+                        "photo": "AgACAgIAAxkDAAIw-mlhHkJ9BbMeFzayJuqoJ_kuuTOZAAJKC2sbEv8QS42H0z1-IipjAQADAgADeAADOAQ",
                         "text": "Коляски для новорожденных..."
                     },
                     "branch": "pregnant",
@@ -25,7 +25,7 @@ QUIZ_CONFIG = {
                 "stroller_6_plus": {
                     "button": "Прогулочная коляска 6+",
                     "preview": {
-                        "photo": "AgACAgIAAxkDAAIvm2lL8xqvOFcn_7scId5LT3hOdo_UAALOEGsb1_tgShr-ys5-yc8iAQADAgADeAADNgQ",
+                        "photo": "AgACAgIAAxkDAAIxC2lhH445PVA2tPxkwhMO1Se6EbsNAAJiC2sbEv8QS-zOLlSkpksgAQADAgADeQADOAQ",
                         "text": "Коляски для детей от 6 мес..."
                     },
                     "branch": "stroller_6_plus",
@@ -34,7 +34,7 @@ QUIZ_CONFIG = {
                 "service_only": {
                     "button": "Коляска уже есть",
                     "preview": {
-                        "photo": "AgACAgIAAxkDAAIvnGlL8xoRVyhRVDvdLMjqgSWdDckUAALPEGsb1_tgSlgghJESMgyvAQADAgADeAADNgQ",
+                        "photo": "AgACAgIAAxkDAAIxOWlhIlRQWjtMQWFDG_j2m2DgKRqOAAKcC2sbEv8QS1UfoePnMUCvAQADAgADdwADOAQ",
                         "text": "Обслуживание колясок..."
                     },
                     "branch": "service_only",
@@ -162,22 +162,22 @@ QUIZ_CONFIG = {
     # =========================
     "service_only": {
         2: {
-            "photo": "AgACAgIAAxkDAAIvmmlL8xnBEHDg1biLDPTtKlHrDdlCAALNEGsb1_tgSkirvkvmJOW5AQADAgADeAADNgQ",
-            "text": "Интересует обслуживание",
+            "photo": "AgACAgIAAxkDAAIxGGlhIFRJHrc-Wp_og1wU4y0KryrOAAJ2C2sbEv8QS5o0-r_wkpX_AQADAgADeQADOAQ",
+            "text": "Укажите пожалуйста тип вашей коляски",
             "options": {
                 "cleaning": {
-                    "button": "Чистка и уход",
+                    "button": "Коляска от рождения 0+",
                     "preview": {
-                        "photo": "AgACAgIAAxkDAAIvmmlL8xnBEHDg1biLDPTtKlHrDdlCAALNEGsb1_tgSkirvkvmJOW5AQADAgADeAADNgQ",
-                        "text": "Регулярная чистка коляски"
+                        "photo": "AgACAgIAAxkDAAIxO2lhIlWf8p-CjgpfYKI6nTY9gi-vAAKdC2sbEv8QS1adHAflDG6xAQADAgADeQADOAQ",
+                        "text": "Коляски с люлькой + прогулочный блок и автолюлька (в зависимости от комплектации)"
                     },
                     "save": {"service_type": "cleaning"}
                 },
                 "repair": {
-                    "button": "Ремонт",
+                    "button": "Прогулочная коляска 6+",
                     "preview": {
-                        "photo": "AgACAgIAAxkDAAIvmmlL8xnBEHDg1biLDPTtKlHrDdlCAALNEGsb1_tgSkirvkvmJOW5AQADAgADeAADNgQ",
-                        "text": "Ремонт механизма и рамы"
+                        "photo": "AgACAgIAAxkDAAIxGmlhIFXxO8sdL1t5ysb7M9yRAWULAAJ4C2sbEv8QS0rXGIJ6uqGJAQADAgADeAADOAQ",
+                        "text": "Коляска для малышей которые уже умеют сидеть"
                     },
                     "save": {"service_type": "repair"}
                 }
