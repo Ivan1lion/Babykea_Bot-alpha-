@@ -92,24 +92,112 @@ QUIZ_CONFIG = {
             "next_level": 3
         },
         3: {
-            "photo": "AgACAgIAAxkDAAIvmWlL8xkbwYjDdjiB46Pr6ZzPR3WIAALMEGsb1_tgSsoFcdev5MQdAQADAgADeAADNgQ",
-            "text": "Выберите материал коляски",
+            "photo": "AgACAgIAAxkDAAIxImlhIkrQvb4IbZpimQ-2Pe4-KKjmAAKSC2sbEv8QSwntknxqUya9AQADAgADeQADOAQ",
+            "text": "Коляска для зимы или для лета?\n\n"
+                    "<blockquote>При выборе коляски нужно учитывать, на какое время года выпадают первые 6 месяцев "
+                    "жизни ребёнка. От этого зависит тип и размер люльки, а также проходимость шасси</blockquote>",
             "options": {
-                "aluminum": {
-                    "button": "Алюминий",
+                "leto": {
+                    "button": "Тёплое время года",
                     "preview": {
-                        "photo": "AgACAgIAAxkDAAIvmmlL8xnBEHDg1biLDPTtKlHrDdlCAALNEGsb1_tgSkirvkvmJOW5AQADAgADeAADNgQ",
-                        "text": "Коляска с алюминиевой рамой"
+                        "photo": "AgACAgIAAxkDAAIxdWliU-Bv0VkENR8e24a7ElnibL8vAAIaEGsbOZkQS2Zoa89NJLTcAQADAgADeQADOAQ",
+                        "text": "<blockquote>Для тёплого периода отлично подходят тканевые люльки (складные на распорках). Такие "
+                                "люльки мало весят, компактно складываются и хорошо дышат за счёт дополнительных "
+                                "секций для проветривания</blockquote>"
                     },
-                    "save": {"frame_material": "aluminum"}
+                    "save": {"vremya_goda": "leto"}
                 },
-                "steel": {
-                    "button": "Сталь",
+                "zima": {
+                    "button": "Холодное время года",
                     "preview": {
-                        "photo": "AgACAgIAAxkDAAIvm2lL8xqvOFcn_7scId5LT3hOdo_UAALOEGsb1_tgShr-ys5-yc8iAQADAgADeAADNgQ",
-                        "text": "Коляска со стальной рамой"
+                        "photo": "AgACAgIAAxkDAAIxdmliU_Ig2e7_a1dkdwZQsCKLbverAAIeEGsbOZkQS1mqqnoV_se2AQADAgADeQADOAQ",
+                        "text": "<blockquote>На холодный период рекомендуются люльки из пластика и термолюльки. Они отличаются "
+                                "большим размером и глубиной, чтобы подросшему крохе в тёплом конверте "
+                                "(зимней одежде) не было тесно</blockquote>"
                     },
-                    "save": {"frame_material": "steel"}
+                    "save": {"vremya_goda": "zima"}
+                }
+            },
+            "next_level": 4
+        },
+        4: {
+            "photo": "AgACAgIAAxkDAAIxAAFpYR9FeZiN3xBqV8zu4GQGeyVyNAACVQtrGxL_EEsHwk3bWiUdBAEAAwIAA3kAAzgE",
+            "text": "Желаемый функционал\n\n"
+                    "<blockquote>Выберете предпочтительный для вас фукционал коляски</blockquote>",
+            "options": {
+                "2in1": {
+                    "button": "2 в 1",
+                    "preview": {
+                        "photo": "AgACAgIAAxkDAAIxA2lhH2vJ6Bt48gxuveynfK49bJExAAJYC2sbEv8QS-890ddSdERpAQADAgADdwADOAQ",
+                        "text": "<blockquote>Модульная коляска с двумя сменными блоками. Люлька и сидячий блок</blockquote>"
+                    },
+                    "save": {"funkcional": "2in1"}
+                },
+                "3in1": {
+                    "button": "3 в 1",
+                    "preview": {
+                        "photo": "AgACAgIAAxkDAAIxJWlhIksVxtKNBa1BENCyz68PDOrXAAKTC2sbEv8QSy4VrYTg9ufeAQADAgADdwADOAQ",
+                        "text": "<blockquote>Люлька, сидячий блок + автолюлька для перевозки новорожденного (до 3х "
+                                "месяцев) в автомобиле</blockquote>"
+                    },
+                    "save": {"funkcional": "3in1"}
+                },
+                "transformer": {
+                    "button": "Трансформер",
+                    "preview": {
+                        "photo": "AgACAgIAAxkDAAIxJmlhIkvPndJ0-0GTmuuyCTSj_efTAAKUC2sbEv8QS0cWwgcRVVKOAQADAgADeQADOAQ",
+                        "text": "<blockquote>Коляска у которой люлька по средствам регуляции тросиков или "
+                                "строп трансформируется в сидячий блок. Практичные, но менее комфортные "
+                                "коляски</blockquote>"
+                    },
+                    "save": {"funkcional": "transformer"}
+                }
+            },
+            "next_level": 5
+        },
+        5: {
+            "photo": "AgACAgIAAxkDAAIxBmlhH3Z9Dn3FgqklPnajz_ZQwN3wAAJcC2sbEv8QS84pEuGqzo7tAQADAgADeQADOAQ",
+            "text": "Тип дороги преимущественно по которому будете ездить\n\n"
+                    "<blockquote>Очень важно определить тип дорог вашей местности. От этого зависит на сколько "
+                    "удобным будет управление коляской и комфорт малыша</blockquote>",
+            "options": {
+                "grynt": {
+                    "button": "Грунт",
+                    "preview": {
+                        "photo": "AgACAgIAAxkDAAIxB2lhH3oqjnS8aCU2unE1ryLbcdeWAAJdC2sbEv8QS-ngqRnZB1ihAQADAgADeQADOAQ",
+                        "text": "<blockquote>Детская коляска подходящая для передвижения по грунту. Большие колёса, "
+                                "крепкая рама - если живёте за городом</blockquote>"
+                    },
+                    "save": {"tip_dorogi": "grynt"}
+                },
+                "asfalt": {
+                    "button": "Алфальт",
+                    "preview": {
+                        "photo": "AgACAgIAAxkDAAIxCGlhH32H2Mhd3sbANA-bCT6h6EbxAAJeC2sbEv8QSxA_DXnKTulGAQADAgADeQADOAQ",
+                        "text": "<blockquote>Коляска может иметь маленькие колеса и минимальный размер (массу) "
+                                "шасси</blockquote>"
+                    },
+                    "save": {"tip_dorogi": "asfalt"}
+                },
+                "combo": {
+                    "button": "Комбинированный",
+                    "preview": {
+                        "photo": "AgACAgIAAxkDAAIxCWlhH3_d0nBQH6ZQoZ7qHexOdwHrAAJfC2sbEv8QSzH_B-ea_v4LAQADAgADeAADOAQ",
+                        "text": "<blockquote>Детская коляска подходящая для передвижения по грунту, асфальту "
+                                "или плитке. Обладает средним размером колёс и неплохой системой амортизации</blockquote>"
+                    },
+                    "save": {"tip_dorogi": "combo"}
+                },
+                "off_road": {
+                    "button": "Off-road",
+                    "preview": {
+                        "photo": "AgACAgIAAxkDAAIxCmlhH4naMSKH52Py0ikdakBza8ftAAJhC2sbEv8QS6G-L6GqRQNEAQADAgADeQADOAQ",
+                        "text": "<blockquote>Коляски-вездеходы способны преодолевать бездорожье. Для таких колясок "
+                                "характерны четыре одинаковых больших колеса и массивная рама. Они менее поворотливы "
+                                "и тяжелы. Но если нужно уходить от погони по снегу – это идеальный вариант. Выбор "
+                                "родителей из северных регионов</blockquote>"
+                    },
+                    "save": {"tip_dorogi": "off_road"}
                 }
             },
             "next_level": None
