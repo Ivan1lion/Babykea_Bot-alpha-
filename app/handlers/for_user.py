@@ -56,6 +56,13 @@ async def cmd_start(message: Message, bot: Bot, session: AsyncSession):
 
 # ОБРАБОТЧИКИ
 
+# Хендлер для определения id гифки
+# @for_user_router.message()
+# async def catch_animation(message: Message):
+#     if message.animation:
+#         await message.answer(
+#             f"file_id:\n<code>{message.animation.file_id}</code>"
+#         )
 
 
 #НАЧАЛО КВИЗА старый вариант
