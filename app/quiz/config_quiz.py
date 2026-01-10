@@ -56,32 +56,37 @@ QUIZ_CONFIG = {
     # =========================
     "pregnant": {
         2: {
-            "photo": "AgACAgIAAxkDAAIvnWlL8xu3FXKFt7ZI7VYf_ELL5NSvAALQEGsb1_tgSi_3x88-tK7ZAQADAgADeAADNgQ",
-            "text": "Сфера применения коляски",
+            "photo": "AgACAgIAAxkDAAIw_WlhHq-pcY1UuhTjd-so7qsAAcz8VgACUQtrGxL_EEvXYwYoJjNfvgEAAwIAA3kAAzgE",
+            "text": "Сфера применения коляски\n\n"
+                    "<blockquote>Выберите, для выполнения каких основных задач требуется коляска</blockquote>",
             "options": {
                 "daily": {
                     "button": "Для ежедневных прогулок",
                     "preview": {
-                        "photo": "AgACAgIAAxkDAAIvnmlL8xvfT3zuXadTqTSCUbFCvKkdAALREGsb1_tgSt86pm6tU0c5AQADAgADeAADNgQ",
-                        "text": "Для ежедневных прогулок"
+                        "photo": "AgACAgIAAxkDAAIw_mlhHr1CniI5Ab78iqHQ2rRbmPTkAAJSC2sbEv8QSzbFBhmNlWWnAQADAgADeQADOAQ",
+                        "text": "<blockquote>Детские коляски для ежедневных прогулок возле дома или в парке</blockquote>"
                     },
                     "save": {"usage": "daily_walks"}
                 },
                 "autolady": {
                     "button": "Я автоледи",
                     "preview": {
-                        "photo": "AgACAgIAAxkDAAIvnmlL8xvfT3zuXadTqTSCUbFCvKkdAALREGsb1_tgSt86pm6tU0c5AQADAgADeAADNgQ",
-                        "text": "Коляски которые более компактные что бы помещались в багажник авто"
+                        "photo": "AgACAgIAAxkDAAIxIGlhIkmhwlLRl5dvRj8wD_C0ZEKCAAKRC2sbEv8QS5E85t0_MAuRAQADAgADdwADOAQ",
+                        "text": "<blockquote>Коляски, которые более компактные, чтобы помещались в багажник автомобиля</blockquote>"
                     },
                     "save": {"usage": "autolady"}
                 },
                 "travel": {
                     "button": "Для путешествий",
                     "preview": {
-                        "photo": "AgACAgIAAxkDAAIvnmlL8xvfT3zuXadTqTSCUbFCvKkdAALREGsb1_tgSt86pm6tU0c5AQADAgADeAADNgQ",
-                        "text": "Для перелётов, коляски компактные"
+                        "photo": "AgACAgIAAxkDAAIw_2lhHwM1PihBh5cjowVPdzANcQEJAAJUC2sbEv8QS9m1_R5LMJ5NAQADAgADeQADOAQ",
+                        "text": "<blockquote>Как правило, это самые минималистичные и компактные коляски. Некоторые "
+                                "модели разрешено проносить в качестве ручной клади на борт самолётов. Такие коляски "
+                                "не отличаются высокой проходимостью и предназначены исключительно для ровных "
+                                "асфальтированных дорог</blockquote>"
                     },
-                    "save": {"usage": "travel"}
+                    "save": {"usage": "travel"},
+                    "finish": True
                 },
             },
             "next_level": 3
@@ -169,13 +174,16 @@ QUIZ_CONFIG = {
     "service_only": {
         2: {
             "photo": "AgACAgIAAxkDAAIxGGlhIFRJHrc-Wp_og1wU4y0KryrOAAJ2C2sbEv8QS5o0-r_wkpX_AQADAgADeQADOAQ",
-            "text": "Укажите пожалуйста тип вашей коляски",
+            "text": "Укажите пожалуйста тип вашей коляски\n\n"
+                    "<blockquote>В зависимости от типа коляски может отличаться время и частота обслуживания, а "
+                    "также некоторые рекомендации по эксплуатации</blockquote>",
             "options": {
                 "cleaning": {
                     "button": "Коляска от рождения 0+",
                     "preview": {
                         "photo": "AgACAgIAAxkDAAIxO2lhIlWf8p-CjgpfYKI6nTY9gi-vAAKdC2sbEv8QS1adHAflDG6xAQADAgADeQADOAQ",
-                        "text": "Коляски с люлькой + прогулочный блок и автолюлька (в зависимости от комплектации)"
+                        "text": "<blockquote>Коляски с люлькой + прогулочный блок и автолюлька (в зависимости от "
+                                "комплектации)</blockquote>"
                     },
                     "save": {"service_type": "cleaning"}
                 },
@@ -183,7 +191,7 @@ QUIZ_CONFIG = {
                     "button": "Прогулочная коляска 6+",
                     "preview": {
                         "photo": "AgACAgIAAxkDAAIxGmlhIFXxO8sdL1t5ysb7M9yRAWULAAJ4C2sbEv8QS0rXGIJ6uqGJAQADAgADeAADOAQ",
-                        "text": "Коляска для малышей которые уже умеют сидеть"
+                        "text": "<blockquote>Коляска для малышей которые уже умеют сидеть</blockquote>"
                     },
                     "save": {"service_type": "repair"}
                 }

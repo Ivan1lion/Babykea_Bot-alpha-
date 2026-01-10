@@ -80,7 +80,15 @@ async def save_and_next(
     save_data = option.get("save", {})
     profile.data.update(save_data)
 
+    # 🏁 ЗАВЕРШЕНИЕ КВИЗА ПО КНОПКЕ
+    if option.get("finish"):
+        profile.completed = True
+        profile.data.pop("_selected", None)
+        session.add(profile)
+        await session.commit()
+        return
 
+    # 🔹 переход по ветке
     if "branch" in option:
         profile.branch = option["branch"]
         profile.current_level = 2
@@ -90,7 +98,6 @@ async def save_and_next(
         if next_level is None:
             # 🏁 КОНЕЦ КВИЗА
             profile.completed = True
-            # ❗ current_level НЕ ТРОГАЕМ
         else:
             profile.current_level = next_level
 

@@ -50,7 +50,7 @@ dp.include_router(quiz_router)
 
 
 async def on_startup(dispatcher: Dispatcher):
-    print("Bot started")
+    print("Bot started ▶️")
     # await bot.set_webhook(
     #     url=WEBHOOK_URL,
     #     drop_pending_updates=True,
