@@ -17,7 +17,8 @@ QUIZ_CONFIG = {
                     "button": "Я в положении",
                     "preview": {
                         "photo": "AgACAgIAAxkDAAIw-mlhHkJ9BbMeFzayJuqoJ_kuuTOZAAJKC2sbEv8QS42H0z1-IipjAQADAgADeAADOAQ",
-                        "text": "Коляски для новорожденных..."
+                        "text": "<blockquote>Коляски для новорожденных детей. Обязательно с люлькой для малыша, а также со сидячим "
+                                "блоком и автолюлькой в зависимости от модели и комплектации</blockquote>"
                     },
                     "branch": "pregnant",
                     "save": {"user_type": "group_1"}
@@ -26,7 +27,8 @@ QUIZ_CONFIG = {
                     "button": "Прогулочная коляска 6+",
                     "preview": {
                         "photo": "AgACAgIAAxkDAAIxC2lhH445PVA2tPxkwhMO1Se6EbsNAAJiC2sbEv8QS-zOLlSkpksgAQADAgADeQADOAQ",
-                        "text": "Коляски для детей от 6 мес..."
+                        "text": "<blockquote>Коляски для уже подросших детей, способных сидеть. Так называемые "
+                                "'прогулочные' коляски более лёгкие и компактные</blockquote>"
                     },
                     "branch": "stroller_6_plus",
                     "save": {"user_type": "group_2"}
@@ -35,7 +37,11 @@ QUIZ_CONFIG = {
                     "button": "Коляска уже есть",
                     "preview": {
                         "photo": "AgACAgIAAxkDAAIxOWlhIlRQWjtMQWFDG_j2m2DgKRqOAAKcC2sbEv8QS1UfoePnMUCvAQADAgADdwADOAQ",
-                        "text": "Обслуживание колясок..."
+                        "text": "<blockquote>Купить коляску – полдела. Очень важен своевременный уход и знание особых "
+                                "нюансов эксплуатации для предотвращения критического износа коляски, а также "
+                                "безопасности вашего ребенка\n\n"
+                                "❗️Подавляющее большинство поломок не попадает под гарантию производителей и связано "
+                                "с незнанием родителей простых, но неочевидных правил использования колясок</blockquote>"
                     },
                     "branch": "service_only",
                     "save": {"user_type": "group_2"}
