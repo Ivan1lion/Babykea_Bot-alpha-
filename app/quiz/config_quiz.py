@@ -209,47 +209,111 @@ QUIZ_CONFIG = {
     # =========================
     "stroller_6_plus": {
         2: {
-            "photo": "AgACAgIAAxkDAAIvm2lL8xqvOFcn_7scId5LT3hOdo_UAALOEGsb1_tgShr-ys5-yc8iAQADAgADeAADNgQ",
-            "text": "Тип прогулочной коляски",
+            "photo": "AgACAgIAAxkDAAIxLWlhIk7G50gOv8PZBfd6LvA_RGL3AAKVC2sbEv8QSyWutC5mNf-vAQADAgADdwADOAQ",
+            "text": "Сфера применения коляски\n\n"
+                    "<blockquote>Выберите, для выполнения каких основных задач требуется коляска</blockquote>",
             "options": {
-                "compact": {
-                    "button": "Компактная",
+                "daily": {
+                    "button": "Для ежедневных прогулок",
                     "preview": {
-                        "photo": "AgACAgIAAxkDAAIvm2lL8xqvOFcn_7scId5LT3hOdo_UAALOEGsb1_tgShr-ys5-yc8iAQADAgADeAADNgQ",
-                        "text": "Легкая и удобная для города"
+                        "photo": "AgACAgIAAxkDAAIxDWlhH5pVOCaa31wNhQAB_zvSu-cbsgACZAtrGxL_EEuncPZuBmzt4AEAAwIAA3kAAzgE",
+                        "text": "<blockquote>Детские коляски для ежедневных прогулок возле дома или в парке</blockquote>"
                     },
-                    "save": {"stroller_type": "compact"}
+                    "save": {"usage": "daily_walks"}
                 },
-                "all_terrain": {
-                    "button": "Всё проходимая",
+                "autolady": {
+                    "button": "Я автоледи",
                     "preview": {
-                        "photo": "AgACAgIAAxkDAAIvm2lL8xqvOFcn_7scId5LT3hOdo_UAALOEGsb1_tgShr-ys5-yc8iAQADAgADeAADNgQ",
-                        "text": "Для прогулок по разным покрытиям"
+                        "photo": "AgACAgIAAxkDAAIxL2lhIk-jy2KFsRB4bMsTh9CGvlhvAAKWC2sbEv8QSyyhM67R2cs4AQADAgADeQADOAQ",
+                        "text": "<blockquote>Коляски, которые более компактные, чтобы помещались в багажник автомобиля</blockquote>"
                     },
-                    "save": {"stroller_type": "all_terrain"}
-                }
+                    "save": {"usage": "autolady"}
+                },
+                "travel": {
+                    "button": "Для путешествий",
+                    "preview": {
+                        "photo": "AgACAgIAAxkDAAIxMGlhIlBBAyWdCUIFg2Db--PLsP8DAAKXC2sbEv8QS0slgEGbq_10AQADAgADdwADOAQ",
+                        "text": "<blockquote>Как правило, это самые минималистичные и компактные коляски. Некоторые "
+                                "модели разрешено проносить в качестве ручной клади на борт самолётов. Такие коляски "
+                                "не отличаются высокой проходимостью и предназначены исключительно для ровных "
+                                "асфальтированных дорог</blockquote>"
+                    },
+                    "save": {"usage": "travel"},
+                    "finish": True
+                },
             },
             "next_level": 3
         },
         3: {
-            "photo": "AgACAgIAAxkDAAIvm2lL8xqvOFcn_7scId5LT3hOdo_UAALOEGsb1_tgShr-ys5-yc8iAQADAgADeAADNgQ",
-            "text": "Выберите цвет коляски",
+            "photo": "AgACAgIAAxkDAAIxEGlhH9V1TIhe3iLApYnqx5sOMEylAAJqC2sbEv8QSz3xBUJWCS8CAQADAgADeAADOAQ",
+            "text": "Тип ручки коляски\n\n"
+                    "<blockquote>От типа ручки зависит тип складывания коляски и её функциональность</blockquote>",
             "options": {
                 "red": {
-                    "button": "Красная",
+                    "button": "Раздельная",
                     "preview": {
-                        "photo": "AgACAgIAAxkDAAIvm2lL8xqvOFcn_7scId5LT3hOdo_UAALOEGsb1_tgShr-ys5-yc8iAQADAgADeAADNgQ",
-                        "text": "Красная коляска"
+                        "photo": "AgACAgIAAxkDAAIxMmlhIlGGCXSIgYzv_KTHMlfccY6dAAKZC2sbEv8QS2wHadb8hek7AQADAgADdwADOAQ",
+                        "text": "<blockquote>Коляски с таким типом ручек называются «коляски-трости». Зачастую имеют очень "
+                                "слабую проходимость и ограниченную функциональность. Тяжело вести коляску "
+                                "одной рукой</blockquote>"
                     },
                     "save": {"color": "red"}
                 },
                 "blue": {
-                    "button": "Синяя",
+                    "button": "Цельная",
                     "preview": {
-                        "photo": "AgACAgIAAxkDAAIvm2lL8xqvOFcn_7scId5LT3hOdo_UAALOEGsb1_tgShr-ys5-yc8iAQADAgADeAADNgQ",
-                        "text": "Синяя коляска"
+                        "photo": "AgACAgIAAxkDAAIxM2lhIlIJXyZ3LiDO5WslMxFBuEsTAAKaC2sbEv8QS7Qx1qthkXKeAQADAgADdwADOAQ",
+                        "text": "<blockquote>Самый распространённый вид прогулочных колясок. Идеально подходит для ежедневного "
+                                "использования</blockquote>"
                     },
                     "save": {"color": "blue"}
+                }
+            },
+            "next_level": 4
+        },
+        4: {
+            "photo": "AgACAgIAAxkDAAIxE2lhIBOwy3kU5LAiqECkab_Lzby8AAJwC2sbEv8QSyiNAiAqIovPAQADAgADeAADOAQ",
+            "text": "Тип дороги преимущественно по которому будете ездить\n\n"
+                    "<blockquote>Очень важно определить тип дорог вашей местности. От этого зависит на сколько "
+                    "удобным будет управление коляской и комфорт малыша</blockquote>",
+            "options": {
+                "grynt": {
+                    "button": "Грунт",
+                    "preview": {
+                        "photo": "AgACAgIAAxkDAAIxFGlhIBiJUKFOzyP91iyKC58fWtslAAJxC2sbEv8QSz43VSQc2YAGAQADAgADeAADOAQ",
+                        "text": "<blockquote>Детская коляска подходящая для передвижения по грунту. Большие колёса, "
+                                "крепкая рама - если живёте за городом</blockquote>"
+                    },
+                    "save": {"tip_dorogi": "grynt"}
+                },
+                "asfalt": {
+                    "button": "Алфальт",
+                    "preview": {
+                        "photo": "AgACAgIAAxkDAAIxFWlhIBwfX8zMUtV2dW9i13aigeSvAAJyC2sbEv8QS13_ZRHMeE5VAQADAgADeQADOAQ",
+                        "text": "<blockquote>Коляска может иметь маленькие колеса и минимальный размер (массу) "
+                                "шасси</blockquote>"
+                    },
+                    "save": {"tip_dorogi": "asfalt"}
+                },
+                "combo": {
+                    "button": "Комбинированный",
+                    "preview": {
+                        "photo": "AgACAgIAAxkDAAIxN2lhIlO30NiQrp4qLnfAsCB_wE6UAAKbC2sbEv8QS9oRKJbuslSwAQADAgADdwADOAQ",
+                        "text": "<blockquote>Детская коляска подходящая для передвижения по грунту, асфальту "
+                                "или плитке. Обладает средним размером колёс и неплохой системой амортизации</blockquote>"
+                    },
+                    "save": {"tip_dorogi": "combo"}
+                },
+                "off_road": {
+                    "button": "Off-road",
+                    "preview": {
+                        "photo": "AgACAgIAAxkDAAIxF2lhIFM3OMOTFjyGEaRjROXQ2zrWAAJ1C2sbEv8QS-6J447-FN8hAQADAgADdwADOAQ",
+                        "text": "<blockquote>Коляски-вездеходы способны преодолевать бездорожье. Для таких колясок "
+                                "характерны большие колеса и массивная рама. Они менее компактны в сложенном состоянии "
+                                "и достаточно тяжелы. Но если нужно уходить от погони по снегу – это идеальный вариант. "
+                                "Выбор родителей из северных регионов</blockquote>"
+                    },
+                    "save": {"tip_dorogi": "off_road"}
                 }
             },
             "next_level": None
