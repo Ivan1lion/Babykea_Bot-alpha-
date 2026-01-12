@@ -171,7 +171,7 @@ QUIZ_CONFIG = {
                     "save": {"road_conditions": ["ground", "soil"]}
                 },
                 "asphalt": {
-                    "button": "Алфальт",
+                    "button": "Аcфальт",
                     "preview": {
                         "photo": "AgACAgIAAxkDAAIxCGlhH32H2Mhd3sbANA-bCT6h6EbxAAJeC2sbEv8QSxA_DXnKTulGAQADAgADeQADOAQ",
                         "text": "<blockquote>Коляска может иметь маленькие колеса и минимальный размер (массу) "
@@ -287,7 +287,7 @@ QUIZ_CONFIG = {
                     "save": {"road_conditions": ["ground", "soil"]}
                 },
                 "asphalt": {
-                    "button": "Алфальт",
+                    "button": "Аcфальт",
                     "preview": {
                         "photo": "AgACAgIAAxkDAAIxFWlhIBwfX8zMUtV2dW9i13aigeSvAAJyC2sbEv8QS13_ZRHMeE5VAQADAgADeQADOAQ",
                         "text": "<blockquote>Коляска может иметь маленькие колеса и минимальный размер (массу) "
