@@ -18,9 +18,7 @@ client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 channel = int(os.getenv("CHANNEL_ID"))
 
 
-                        ###  ###  ###  Не давать доступ к МЕНЮ если не введен промо-код ###  ###  ###
-
-
+# Не давать доступ к МЕНЮ если не введен промо-код
 async def stop_if_no_promo(
     message: Message,
     session: AsyncSession,
@@ -39,7 +37,7 @@ async def stop_if_no_promo(
     # promo_code пустой → останавливаем
     await message.delete()
 
-    warn_message = await message.answer("Закончите настройку⤴️")
+    warn_message = await message.answer("Завершите настройку⤴️")
 
     await asyncio.sleep(delete_delay)
     await warn_message.delete()

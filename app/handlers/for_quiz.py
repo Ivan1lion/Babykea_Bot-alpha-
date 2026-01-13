@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import User
 from app.db.crud import get_or_create_user
+from app.handlers.keyboards import kb_activation
 from app.quiz.renderer import render_quiz_step, resolve_media, build_keyboard
 from app.quiz.quiz_state_service import (
     get_or_create_quiz_profile,
@@ -169,11 +170,11 @@ async def quiz_next(
             animation="CgACAgQAAxkBAAIxe2liVpUmUuaoAAEWiAq4dZsc4CTygQACBAMAAvYbHVNpZ9ehQ-1QTjgE",
             caption=(
                 "✅ Спасибо! Квиз-опрос завершён\n\n"
-                "Я сохранил ваши ответы для понимания контекста. Вы всегда можете перепройти квиз для изменения "
-                "ваших исходных данных\n\n"
-                "Что делать дальше? Нажмите кнопку ниже и я всё подробно расскажу 🧐"
+                "Я сохранил ваши ответы для понимания контекста и настройки системы. Вы всегда можете перепройти "
+                "квиз для изменения ваших исходных данных <blockquote>[Меню] >> [👤 Мой профиль]</blockquote>\n\n"
+                "Остался последний шаг - получить доступ к функционалу бота"
             ),
-            reply_markup=None,
+            reply_markup=kb_activation,
         )
         return
 
@@ -220,6 +221,7 @@ async def quiz_back(
     )
 
 
+# Сброс и перезапуск квиз-формы
 @quiz_router.message(Command("quiz_restart"))
 async def restart_quiz_cmd(
     message: Message,

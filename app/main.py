@@ -31,8 +31,8 @@ storage = MemoryStorage()
 bot = Bot(token=os.getenv("TOKEN"), default=DefaultBotProperties(parse_mode=ParseMode.HTML))
 dp = Dispatcher(storage=storage)
 
-dp.include_router(for_user_router)
 dp.include_router(menu_cmds_router)
+dp.include_router(for_user_router)
 dp.include_router(quiz_router)
 
 

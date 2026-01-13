@@ -16,7 +16,7 @@ from sqlalchemy import select
 
 import app.handlers.keyboards as kb
 from app.handlers.keyboards import payment_button_keyboard
-from app.db.crud import get_or_create_user
+from app.db.crud import get_or_create_user, stop_if_no_promo
 from app.db.models import User, MagazineChannel, ChannelState
 from app.db.config import session_maker
 from app.posting.resolver import resolve_channel_context
@@ -74,66 +74,86 @@ async def filter(message: Message):
     await message.answer("Запросы AI консультанту только в формате текста")
 
 
+@for_user_router.callback_query(F.data == "kb_activation")
+async def activation (call: CallbackQuery, bot: Bot):
+    await call.message.edit_reply_markup(reply_markup=None)
+    await call.answer()
+    await call.bot.copy_message(
+        chat_id=call.message.chat.id,
+        from_chat_id=-1003498991864,  # ID группы
+        message_id=4,  # ID сообщения из группы
+        reply_markup=kb.quiz_start
+    )
+
+
+
 
 
 ######################### Обработка запросов пользователя к AI #########################
 
 
-# Функция, чтобы крутился индикатор "печатает"
-# async def send_typing(bot, chat_id, stop_event):
-#     while not stop_event.is_set():
-#         await bot.send_chat_action(chat_id=chat_id, action="typing")
-#         await asyncio.sleep(4.5)
-#
-# @for_user_router.message(F.text)
-# async def handle_text(message: Message, session: AsyncSession, bot: Bot):
-#     result = await session.execute(select(User).where(User.telegram_id == message.from_user.id))
-#     user = result.scalar_one_or_none()
-#     if user.requests_left == 0:
-#         await message.answer(f"🚫 У вас закончились запросы\n\nПожалуйста, пополните баланс"
-#                              f"\n\n<a href='https://telegra.ph/pvapavp-07-04'>"
-#                              "(Почему бот стал платным?)</a>", reply_markup=kb.pay)
-#
-#     if not openai_queue:
-#         await message.answer("⚠️ Ассистент временно недоступен\n\nПовторите пожалуйста запрос позже")
-#         return
-#
-#     try:
-#         typing_msg = await message.answer("Ваш запрос обрабатывается и готовиться ответ 💬") # Отправляем текст
-#
-#         # 🟡 Обновляем статус запроса
-#         user.request_status = "pending"
-#         await session.commit()
-#
-#         # Стартуем фоновый "набор текста"
-#         stop_event = asyncio.Event()
-#         typing_task = asyncio.create_task(send_typing(bot, message.chat.id, stop_event))
-#
-#         answer = await ask_assistant(
-#             queue=openai_queue,
-#             user_id=user.telegram_id,
-#             thread_id=user.thread_id,
-#             message=message.text
-#         )
-#
-#         # Убираем индикаторы
-#         stop_event.set()
-#         typing_task.cancel()
-#         await typing_msg.delete()
-#
-#
-#         await message.answer(answer, parse_mode=ParseMode.MARKDOWN)
-#
-#         # ✅ Запрос выполнен
-#         user.requests_left -= 1
-#         user.request_status = "complete"
-#         await session.commit()
-#     except Exception as e:
-#         await message.answer(f'⚠️ Ошибка при обработке запроса: {str(e)}\n\nЕсли эта ошибка повторится сообщите '
-#                              f'пожалуйста об этом администратору нашего сервиса '
-#                              f'<a href="https://t.me/RomanMo_admin">@RomanMo_admin</a>')
-#
-#
+#Функция, чтобы крутился индикатор "печатает"
+async def send_typing(bot, chat_id, stop_event):
+    while not stop_event.is_set():
+        await bot.send_chat_action(chat_id=chat_id, action="typing")
+        await asyncio.sleep(4.5)
+
+@for_user_router.message(F.text)
+async def handle_text(message: Message, session: AsyncSession, bot: Bot):
+    should_stop = await stop_if_no_promo(
+        message=message,
+        session=session,
+    )
+    if should_stop:
+        return
+
+    result = await session.execute(select(User).where(User.telegram_id == message.from_user.id))
+    user = result.scalar_one_or_none()
+    if user.requests_left == 0:
+        await message.answer(f"🚫 У вас закончились запросы\n\nПожалуйста, пополните баланс"
+                             f"\n\n<a href='https://telegra.ph/pvapavp-07-04'>"
+                             "(Почему бот стал платным?)</a>", reply_markup=kb.pay)
+
+    if not openai_queue:
+        await message.answer("⚠️ Ассистент временно недоступен\n\nПовторите пожалуйста запрос позже")
+        return
+
+    try:
+        typing_msg = await message.answer("Ваш запрос обрабатывается и готовиться ответ 💬") # Отправляем текст
+
+        # 🟡 Обновляем статус запроса
+        user.request_status = "pending"
+        await session.commit()
+
+        # Стартуем фоновый "набор текста"
+        stop_event = asyncio.Event()
+        typing_task = asyncio.create_task(send_typing(bot, message.chat.id, stop_event))
+
+        answer = await ask_assistant(
+            queue=openai_queue,
+            user_id=user.telegram_id,
+            thread_id=user.thread_id,
+            message=message.text
+        )
+
+        # Убираем индикаторы
+        stop_event.set()
+        typing_task.cancel()
+        await typing_msg.delete()
+
+
+        await message.answer(answer, parse_mode=ParseMode.MARKDOWN)
+
+        # ✅ Запрос выполнен
+        user.requests_left -= 1
+        user.request_status = "complete"
+        await session.commit()
+    except Exception as e:
+        await message.answer(f'⚠️ Ошибка при обработке запроса: {str(e)}\n\nЕсли эта ошибка повторится сообщите '
+                             f'пожалуйста об этом администратору нашего сервиса '
+                             f'<a href="https://t.me/RomanMo_admin">@RomanMo_admin</a>')
+
+
 #
 #
 # # Приём платежа

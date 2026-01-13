@@ -7,15 +7,15 @@ quiz_start = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="�
 
 
 
-#Перезапуск квиз-формы
+#Перезапуск квиз-формы в случае ошибки
 quiz_false = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="🔄 Перезапуск",
                                                                          callback_data="quiz:start")]])
 
 
 
-#Перезапуск квиз-формы
-quiz_false = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="🔄 Перезапуск",
-                                                                         callback_data="quiz:start")]])
+#Переход к авторизации пользователя
+kb_activation = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="Получить доступ",
+                                                                         callback_data="kb_activation")]])
 
 
 
