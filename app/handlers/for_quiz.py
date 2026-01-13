@@ -139,7 +139,7 @@ async def quiz_next(
     # ⛔ запрет «Далее» без выбора
     if not validate_next(selected_option):
         await call.answer(
-            "Выберите вариант и затем нажмите «Далее»",
+            "Выберите вариант и затем нажмите кнопку «Далее»",
             show_alert=True,
         )
         return

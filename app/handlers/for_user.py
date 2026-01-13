@@ -65,35 +65,6 @@ async def cmd_start(message: Message, bot: Bot, session: AsyncSession):
 #         )
 
 
-#НАЧАЛО КВИЗА старый вариант
-# @for_user_router.callback_query(F.data == "quiz:start")
-# async def clear_handler(callback: CallbackQuery, bot: Bot):
-#     await callback.answer()
-#     await callback.message.edit_reply_markup(reply_markup=None)
-#     try:
-#         await bot.copy_message(
-#             chat_id=callback.message.chat.id,
-#             from_chat_id=-1003498991864, # ID канала
-#             message_id=5,  # ID сообщения из канала
-#             caption=f"Выберете пожалуйста верное утверждение:"
-#                     f"\n\n1. Я в положении - ищу коляску для новорожденного 🤰"
-#                     f"\n\n2. Ищу прогулочную коляску для ребенка от 6 мес. и старше 👶"
-#                     f"\n\n3. Коляска уже есть",
-#             reply_markup = kb.user_group
-#         )
-#     except Exception as e:
-#         print("Ошибка copy_message:", e)
-#         # Получаем абсолютный путь к медиа-файлу
-#         BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-#         GIF_PATH = os.path.join(BASE_DIR, "..", "mediafile_for_bot", "My_photo.png")
-#         gif_file = FSInputFile(GIF_PATH)
-#         # Отправляем медиа
-#         await callback.message.answer_photo(photo=gif_file,caption=f'Выберете пожалуйста верное утверждение:'
-#                                                                    f'\n\n1. Я в положении - ищу коляску для новорожденного'
-#                                                                    f'\n\n2. Ищу прогулочную коляску для ребенка от 6 мес. и '
-#                                                                    f'старше'
-#                                                                    f'\n\n3. ')
-
 
 
 

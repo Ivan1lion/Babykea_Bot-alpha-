@@ -5,6 +5,7 @@ from aiogram.types import Message, FSInputFile, LinkPreviewOptions
 from sqlalchemy.ext.asyncio import AsyncSession
 from aiogram import Router, Bot
 from app.comands_menu.text_for_user import text_blog
+from app.db.crud import stop_if_no_promo
 
 
 
@@ -27,7 +28,14 @@ bot_menu = [
 
 # команды для кнопки МЕНЮ
 @menu_cmds_router.message(Command("what"))
-async def policy_cmd(message: Message):
+async def policy_cmd(message: Message, session: AsyncSession):
+    should_stop = await stop_if_no_promo(
+        message=message,
+        session=session,
+    )
+    if should_stop:
+        return
+
     await message.answer(f" 1. Карусель видеороликов о нюансах подбора детской коляски"
                          f"\n\n 2. Квиз по подбору типа коляски"
                          f"\n\n 3. Тригер про AI с призывам сделать запрос")

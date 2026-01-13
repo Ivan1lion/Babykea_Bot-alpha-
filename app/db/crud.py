@@ -1,10 +1,13 @@
 import os
+import asyncio
+
 from aiogram import Bot
+from aiogram.types import Message
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from openai import AsyncOpenAI
 from .models import User
-from app.db.models import ChannelState, MagazineChannel, MyChannel
+from app.db.models import ChannelState, MagazineChannel, MyChannel, User
 
 
 
@@ -13,6 +16,35 @@ client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 #для постинга
 channel = int(os.getenv("CHANNEL_ID"))
+
+
+                        ###  ###  ###  Не давать доступ к МЕНЮ если не введен промо-код ###  ###  ###
+
+
+async def stop_if_no_promo(
+    message: Message,
+    session: AsyncSession,
+    delete_delay: int = 1,
+) -> bool:
+    result = await session.execute(
+        select(User.promo_code).where(
+            User.telegram_id == message.from_user.id
+        )
+    )
+    promo_code = result.scalar_one_or_none()
+
+    if promo_code:
+        return False  # НЕ останавливаем хэндлер
+
+    # promo_code пустой → останавливаем
+    await message.delete()
+
+    warn_message = await message.answer("Закончите настройку⤴️")
+
+    await asyncio.sleep(delete_delay)
+    await warn_message.delete()
+
+    return True
 
 
                                         ###  ###  ###  Для AI и БД ###  ###  ###
