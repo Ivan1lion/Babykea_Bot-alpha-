@@ -10,6 +10,7 @@ from app.db.crud import stop_if_no_promo
 
 
 
+
 menu_cmds_router = Router()
 
 
@@ -91,7 +92,7 @@ async def policy_cmd(message: Message, bot: Bot, session: AsyncSession):
 
 
 @menu_cmds_router.message(Command("blog"))
-async def policy_cmd(message: Message, session: AsyncSession):
+async def policy_cmd(message: Message, bot: Bot, session: AsyncSession):
     should_stop = await stop_if_no_promo(
         message=message,
         session=session,
@@ -99,7 +100,11 @@ async def policy_cmd(message: Message, session: AsyncSession):
     if should_stop:
         return
 
-    await message.answer(text=text_blog, link_preview_options=LinkPreviewOptions(is_disabled=True))
+    await bot.forward_message(
+        chat_id=message.chat.id,
+        from_chat_id=-1003540154410,  # ID группы
+        message_id=7  # ID сообщения из группы
+    )
 
 
 @menu_cmds_router.message(Command("help"))
