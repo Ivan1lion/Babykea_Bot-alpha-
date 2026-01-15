@@ -4,7 +4,7 @@ from aiogram.filters import Command
 from aiogram.types import Message, FSInputFile, LinkPreviewOptions
 from sqlalchemy.ext.asyncio import AsyncSession
 from aiogram import Router, Bot
-from app.comands_menu.text_for_user import text_blog, text_offer
+from app.comands_menu.text_for_user import text_offer
 from app.db.crud import stop_if_no_promo
 
 

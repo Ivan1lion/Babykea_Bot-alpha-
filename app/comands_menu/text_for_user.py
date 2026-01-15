@@ -1,3 +1,21 @@
+text_offer = (f"1. <a href='https://telegra.ph/Oferta-dlya-chat-bota-Babykea-Bot-Babykea-07-14'>Публичная оферта, "
+              f"Пользовательское соглашение, условия эксплуатации и обслуживания</a>\n\n"
+              f"2. <a href='https://telegra.ph/Politika-konfidencialnosti-07-26-9'>Политика Конфиденциальности</a>")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 text_blog = (f"#мысливслух\n"
              f"<blockquote>не рекомендации, но информация к размышлению молодым родителям</blockquote>\n\n"
              f"1. <a href='https://dzen.ru/a/YGV2A-G8U1sQbLkc'>Почему при выборе коляски нельзя доверять отзывам в "
@@ -16,22 +34,6 @@ text_blog = (f"#мысливслух\n"
              f"2. <a href='https://rutube.ru/video/b00a99167eb201cffdc8e79b53b72921/?r=plwd'>Амортизация, системы "
              f"антишок и прочая ерунда</a>\n\n"
              )
-
-text_offer = (f"1. <a href='https://telegra.ph/Oferta-dlya-chat-bota-Babykea-Bot-Babykea-07-14'>Публичная оферта, "
-              f"Пользовательское соглашение, условия эксплуатации и обслуживания </a>\n\n"
-              f"2. <a href='https://telegra.ph/Politika-konfidencialnosti-07-26-9'>Политика Конфиденциальности</a>")
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 text_privacy = (f"<a href='https://telegra.ph/Politika-konfidencialnosti-07-26-9'>Этот документ описывает политику "

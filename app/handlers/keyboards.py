@@ -6,7 +6,6 @@ quiz_start = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="�
 
 
 
-
 #Перезапуск квиз-формы в случае ошибки
 quiz_false = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="🔄 Перезапуск",
                                                                          callback_data="quiz:start")]])
@@ -16,6 +15,28 @@ quiz_false = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="�
 #Переход к авторизации пользователя
 kb_activation = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="Получить доступ",
                                                                          callback_data="kb_activation")]])
+
+
+#Успешная авторизация
+successful_activation = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="йййййййй",
+                                                                         callback_data="successful_activation")]])
+
+
+#Инструкция к боту (переход по ссылки на статью)
+instructions_for_bot = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="Инструкция к боту",
+                                                                         url="https://telegra.ph/Navigaciya-01-15-10")]])
+
+
+activation_kb = InlineKeyboardMarkup(
+    inline_keyboard=[
+        [
+            InlineKeyboardButton(text="💳 Оплатить", callback_data="pay_access"),
+        ],
+        [
+            InlineKeyboardButton(text="🔑 Ввести код активации", callback_data="enter_promo"),
+        ],
+    ]
+)
 
 
 

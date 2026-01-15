@@ -7,9 +7,11 @@ import aiohttp
 import base64
 
 from aiogram import F, Router, types, Bot
-from aiogram.filters import CommandStart
+from aiogram.filters import CommandStart, StateFilter
 from aiogram.types import Message, FSInputFile, CallbackQuery, InputMediaPhoto, PreCheckoutQuery, ContentType, SuccessfulPayment
 from aiogram.enums import ParseMode
+from aiogram.fsm.state import StatesGroup, State
+from aiogram.fsm.context import FSMContext
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
@@ -17,7 +19,7 @@ from sqlalchemy import select
 import app.handlers.keyboards as kb
 from app.handlers.keyboards import payment_button_keyboard
 from app.db.crud import get_or_create_user, stop_if_no_promo
-from app.db.models import User, MagazineChannel, ChannelState
+from app.db.models import User, MagazineChannel, ChannelState, Magazine
 from app.db.config import session_maker
 from app.posting.resolver import resolve_channel_context
 from app.posting.state import is_new_post
@@ -26,11 +28,13 @@ from app.posting.dispatcher import dispatch_post
 # from app.openai_assistant.queue import openai_queue
 
 
-# channel = int(os.getenv("CHANNEL_ID"))
 
 for_user_router = Router()
 
+# channel = int(os.getenv("CHANNEL_ID"))
 
+class ActivationState(StatesGroup):
+    waiting_for_promo_code = State()
 
 
 # команд СТАРТ
@@ -74,19 +78,84 @@ async def filter(message: Message):
     await message.answer("Запросы AI консультанту только в формате текста")
 
 
+# @for_user_router.callback_query(F.data == "kb_activation")
+# async def activation (call: CallbackQuery, bot: Bot):
+#     await call.message.edit_reply_markup(reply_markup=None)
+#     await call.answer()
+#     await call.bot.copy_message(
+#         chat_id=call.message.chat.id,
+#         from_chat_id=-1003498991864,  # ID группы
+#         message_id=4,  # ID сообщения из группы
+#         reply_markup=kb.instructions_for_bot
+#     )
+
+
 @for_user_router.callback_query(F.data == "kb_activation")
-async def activation (call: CallbackQuery, bot: Bot):
+async def activation(call: CallbackQuery):
     await call.message.edit_reply_markup(reply_markup=None)
-    await call.answer()
-    await call.bot.copy_message(
-        chat_id=call.message.chat.id,
-        from_chat_id=-1003498991864,  # ID группы
-        message_id=4,  # ID сообщения из группы
-        reply_markup=kb.quiz_start
+
+    await call.message.answer(
+        "Вы можете оплатить доступ к боту или активировать его по промо-коду",
+        reply_markup=kb.activation_kb,
     )
+    await call.answer()
 
 
+@for_user_router.callback_query(F.data == "pay_access")
+async def pay_access(call: CallbackQuery):
+    await call.answer("Увы, способ оплаты временно не доступен", show_alert=True)
 
+
+@for_user_router.callback_query(F.data == "enter_promo")
+async def enter_promo(call: CallbackQuery, state: FSMContext):
+    await call.message.edit_reply_markup(reply_markup=None)
+
+    await state.set_state(ActivationState.waiting_for_promo_code)
+
+    await call.message.answer("Введите код активации текстом:")
+    await call.answer()
+
+
+@for_user_router.message(StateFilter(ActivationState.waiting_for_promo_code), F.text)
+async def process_promo_code(
+    message: Message,
+    state: FSMContext,
+    session: AsyncSession,
+    bot: Bot,
+):
+    promo_code = message.text.strip().upper()
+
+    result = await session.execute(
+        select(Magazine).where(Magazine.promo_code == promo_code)
+    )
+    magazine = result.scalar_one_or_none()
+
+    if not magazine:
+        await message.answer("Увы, данный код не действителен")
+        return
+
+    # обновляем пользователя
+    result = await session.execute(
+        select(User).where(User.telegram_id == message.from_user.id)
+    )
+    user = result.scalar_one()
+
+    user.promo_code = promo_code
+    user.magazine_id = magazine.id
+
+    await session.commit()
+
+    await state.clear()
+
+    await message.answer(f'✅ Проведена успешная активация по промокоду магазина детских колясок "{magazine.name}"\n\n'
+                         f'Контакты продавца будут находиться в меню в разделе\n'
+                         f'"📍 Магазин колясок"')
+    await bot.copy_message(
+            chat_id=message.chat.id,
+            from_chat_id=-1003498991864,  # ID группы
+            message_id=4,  # ID сообщения из группы
+            reply_markup=kb.instructions_for_bot
+        )
 
 
 ######################### Обработка запросов пользователя к AI #########################
