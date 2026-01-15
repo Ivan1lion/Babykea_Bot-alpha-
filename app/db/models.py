@@ -28,7 +28,10 @@ class Magazine(Base):
     name: Mapped[str] = mapped_column(String(150), nullable=False)
     city: Mapped[str] = mapped_column(String(100), nullable=True)
     address: Mapped[str] = mapped_column(String(255), nullable=True)
-    website: Mapped[str] = mapped_column(String(255), nullable=True)
+    name_website: Mapped[str] = mapped_column(String(255), nullable=True)
+    url_website: Mapped[str] = mapped_column(String(255), nullable=True)
+    map_url: Mapped[str] = mapped_column(String(500), nullable=True)
+    username_magazine: Mapped[str] = mapped_column(String(150), nullable=True)
 
 
 

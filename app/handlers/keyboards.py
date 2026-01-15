@@ -17,10 +17,6 @@ kb_activation = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text
                                                                          callback_data="kb_activation")]])
 
 
-#Успешная авторизация
-successful_activation = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="йййййййй",
-                                                                         callback_data="successful_activation")]])
-
 
 #Инструкция к боту (переход по ссылки на статью)
 instructions_for_bot = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="Инструкция к боту",
@@ -38,6 +34,22 @@ activation_kb = InlineKeyboardMarkup(
     ]
 )
 
+
+#Ссылка на карту для раздела "📍 Магазин колясок"
+def magazine_map_kb(map_url: str | None) -> InlineKeyboardMarkup | None:
+    if not map_url:
+        return None
+
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="🗺 Открыть на карте",
+                    url=map_url,
+                )
+            ]
+        ]
+    )
 
 
 #Оплата запросов к AI ассистенту

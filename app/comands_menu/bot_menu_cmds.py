@@ -2,10 +2,13 @@ import os
 from aiogram.types import BotCommand
 from aiogram.filters import Command
 from aiogram.types import Message, FSInputFile, LinkPreviewOptions
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from aiogram import Router, Bot
 from app.comands_menu.text_for_user import text_offer
+from app.db.models import User, Magazine
 from app.db.crud import stop_if_no_promo
+from app.handlers.keyboards import magazine_map_kb
 
 
 
@@ -147,7 +150,30 @@ async def policy_cmd(message: Message, session: AsyncSession):
     if should_stop:
         return
 
-    await message.answer("Контактная информация магазина детских колясок")
+    result = await session.execute(
+        select(Magazine)
+        .join(User, User.magazine_id == Magazine.id)
+        .where(User.telegram_id == message.from_user.id)
+    )
+    magazine = result.scalar_one_or_none()
+
+    if not magazine:
+        await message.answer("Магазин не найден")
+        return
+
+    text_parts = [
+        f"<blockquote>{magazine.name}</blockquote>\n\n"
+        f"📍 Город: {magazine.city}\n"
+        f"🏠 Адрес: {magazine.address}\n"
+        f"🌐 Сайт: <a href='{magazine.url_website}'>{magazine.name_website}</a>\n",
+    ]
+    if magazine.username_magazine:
+        text_parts.append(f"💬 Telegram: {magazine.username_magazine}")
+
+    await message.answer(
+        "\n".join(text_parts),
+        reply_markup=magazine_map_kb(magazine.map_url),
+    )
 
 
 @menu_cmds_router.message(Command("offer"))

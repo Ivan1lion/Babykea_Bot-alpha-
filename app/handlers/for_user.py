@@ -78,17 +78,6 @@ async def filter(message: Message):
     await message.answer("Запросы AI консультанту только в формате текста")
 
 
-# @for_user_router.callback_query(F.data == "kb_activation")
-# async def activation (call: CallbackQuery, bot: Bot):
-#     await call.message.edit_reply_markup(reply_markup=None)
-#     await call.answer()
-#     await call.bot.copy_message(
-#         chat_id=call.message.chat.id,
-#         from_chat_id=-1003498991864,  # ID группы
-#         message_id=4,  # ID сообщения из группы
-#         reply_markup=kb.instructions_for_bot
-#     )
-
 
 @for_user_router.callback_query(F.data == "kb_activation")
 async def activation(call: CallbackQuery):
