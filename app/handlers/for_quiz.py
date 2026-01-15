@@ -164,7 +164,19 @@ async def quiz_next(
             await call.message.delete()
         except:
             pass
-        # 2️⃣ отправляем GIF + текст + кнопку
+
+            # 🔁 ПОВТОРНОЕ ПРОХОЖДЕНИЕ
+        if profile.completed_once:
+            await call.message.answer(
+                "✅ Квиз повторно завершён.\n\n"
+                "Мы обновили ваши ответы и учли новые данные."
+            )
+            return
+
+        # 2️⃣ отправляем GIF + текст + кнопку (первое прохождение)
+        profile.completed_once = True
+        session.add(profile)
+        await session.commit()
         await bot.send_animation(
             chat_id=call.message.chat.id,
             animation="CgACAgQAAxkBAAIxe2liVpUmUuaoAAEWiAq4dZsc4CTygQACBAMAAvYbHVNpZ9ehQ-1QTjgE",

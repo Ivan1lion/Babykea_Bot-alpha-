@@ -32,8 +32,9 @@ bot = Bot(token=os.getenv("TOKEN"), default=DefaultBotProperties(parse_mode=Pars
 dp = Dispatcher(storage=storage)
 
 dp.include_router(menu_cmds_router)
-dp.include_router(for_user_router)
 dp.include_router(quiz_router)
+dp.include_router(for_user_router)
+
 
 
 # openai_queue: OpenAIRequestQueue | None = None

@@ -94,6 +94,8 @@ class UserQuizProfile(Base):
         nullable=False,
     )
 
+    completed_once: Mapped[bool] = mapped_column(default=False)
+
 
 
 
