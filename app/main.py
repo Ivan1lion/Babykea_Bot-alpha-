@@ -14,13 +14,11 @@ from dotenv import find_dotenv, load_dotenv
 load_dotenv(find_dotenv())
 
 from app.db.config import create_db, drop_db, session_maker
-from app.db.crud import notify_pending_users
 from app.middlewares.db_session import DataBaseSession
 from app.handlers.for_user import for_user_router
 from app.handlers.for_quiz import quiz_router
 from app.comands_menu.bot_menu_cmds import bot_menu, menu_cmds_router
 from app.posting.queue import start_sender
-# from app.openai_assistant.queue import OpenAIRequestQueue
 # from app.payments.payment_routes import yookassa_webhook_handler
 
 
@@ -37,9 +35,7 @@ dp.include_router(for_user_router)
 
 
 
-# openai_queue: OpenAIRequestQueue | None = None
-#
-#
+
 # # Константы
 # WEBHOOK_PATH = "/webhook"
 # WEBHOOK_HOST = os.getenv("WEBHOOK_HOST")
@@ -67,12 +63,7 @@ async def on_startup(dispatcher: Dispatcher):
     await bot.set_my_short_description(short_description=f"Сервис по подбору (поиску) детских колясок. Разработан "
                                                          f"для молодых родителей"
                                                          f"\n\nadmin: @RomanMo_admin")
-    # await drop_db() # удаление Базы Данных
-    # await create_db() # создание Базы Данных
     asyncio.create_task(start_sender(bot)) # 🔹 запуск очереди рассылки (ВАЖНО)
-    # global openai_queue
-    # openai_queue = OpenAIRequestQueue()
-    # await notify_pending_users(bot, session_maker)
 
 
 

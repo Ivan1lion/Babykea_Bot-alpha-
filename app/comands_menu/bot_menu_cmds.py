@@ -21,7 +21,7 @@ bot_menu = [
     BotCommand(command="what", description="⁉️ Как подобрать коляску"),
     BotCommand(command="where", description="💢 Как не сломать коляску"),
     BotCommand(command="when", description="✅ Как продлить жизнь коляске"),
-    BotCommand(command="ai_consultant", description="🤖 AI консультант"),
+    BotCommand(command="ai_consultant", description="🤖 AI-консультант"),
     BotCommand(command="blog", description="️🧔‍♂️ Блог мастера"),
     BotCommand(command="help", description="🆘 Помощь"),
     BotCommand(command="config", description="👤 Мой профиль"),
@@ -33,11 +33,8 @@ bot_menu = [
 # команды для кнопки МЕНЮ
 @menu_cmds_router.message(Command("what"))
 async def policy_cmd(message: Message, session: AsyncSession):
-    should_stop = await stop_if_no_promo(
-        message=message,
-        session=session,
-    )
-    if should_stop:
+
+    if await stop_if_no_promo(message=message, session=session):
         return
 
     await message.answer(f" 1. Карусель видеороликов о нюансах подбора детской коляски"
@@ -45,39 +42,36 @@ async def policy_cmd(message: Message, session: AsyncSession):
                          f"\n\n 3. Тригер про AI с призывам сделать запрос")
 
 
+
+
 @menu_cmds_router.message(Command("where"))
 async def policy_cmd(message: Message, session: AsyncSession):
-    should_stop = await stop_if_no_promo(
-        message=message,
-        session=session,
-    )
-    if should_stop:
+
+    if await stop_if_no_promo(message=message, session=session):
         return
 
     await message.answer(f" 1. Карусель видеороликов о правилах правильной эксплуатации"
                          f"\n\n 2. Призыв перейти в раздел '💊 Как продлить жизнь коляске'")
 
 
+
+
 @menu_cmds_router.message(Command("when"))
 async def policy_cmd(message: Message, session: AsyncSession):
-    should_stop = await stop_if_no_promo(
-        message=message,
-        session=session,
-    )
-    if should_stop:
+
+    if await stop_if_no_promo(message=message, session=session):
         return
 
     await message.answer(f" 1. Карусель видеороликов о ТО детской коляски"
                          f"\n\n 2. Запуск времени до планового ТО")
 
 
+
+
 @menu_cmds_router.message(Command("ai_consultant"))
 async def policy_cmd(message: Message, bot: Bot, session: AsyncSession):
-    should_stop = await stop_if_no_promo(
-        message=message,
-        session=session,
-    )
-    if should_stop:
+
+    if await stop_if_no_promo(message=message, session=session):
         return
 
     await message.answer(f" 1. Видео или статья о том как пользоваться консультантом"
@@ -94,13 +88,12 @@ async def policy_cmd(message: Message, bot: Bot, session: AsyncSession):
     # await message.answer(text_balance, reply_markup=kb.pay)
 
 
+
+
 @menu_cmds_router.message(Command("blog"))
 async def policy_cmd(message: Message, bot: Bot, session: AsyncSession):
-    should_stop = await stop_if_no_promo(
-        message=message,
-        session=session,
-    )
-    if should_stop:
+
+    if await stop_if_no_promo(message=message, session=session):
         return
 
     await bot.forward_message(
@@ -110,44 +103,39 @@ async def policy_cmd(message: Message, bot: Bot, session: AsyncSession):
     )
 
 
+
+
 @menu_cmds_router.message(Command("help"))
 async def policy_cmd(message: Message, session: AsyncSession):
-    should_stop = await stop_if_no_promo(
-        message=message,
-        session=session,
-    )
-    if should_stop:
+
+    if await stop_if_no_promo(message=message, session=session):
         return
 
     await message.answer(f" 1. Адрес магазина («Ваш магазин»)"
                          f"\n\n 2. Ответы на частые вопросы (Типовые и по модели коляски пользователя)")
 
 
+
+
 @menu_cmds_router.message(Command("config"))
 async def policy_cmd(message: Message, session: AsyncSession):
-    should_stop = await stop_if_no_promo(
-        message=message,
-        session=session,
-    )
-    if should_stop:
+
+    if await stop_if_no_promo(message=message, session=session):
         return
 
-    await message.answer(f"1. Выбор статуса /quiz_restart"
-                         f"\n\n2. Указать ПДР или возраст ребенка (развития ребенка по месяцам (что и когда он "
-                         f"должен делать), календарь прививок (показывает когда и какую нужно сделать плановую прививку)"
-                         f"\n\n3. Изменить время ТО"
-                         f"\n\n4. Созраненная информация")
+    await message.answer(f"1. /quiz_restart - пройти квиз-опрос заново"
+                         f"<blockquote>На основании ваших ответов AI-консультант подбирает и сравнивает коляски, "
+                         f"соответствующие запросу</blockquote>"
+                         f"\n\n2. Изменить время ТО"
+                         f"\n\n3. Сохраненная информация")
 
 
 
 
 @menu_cmds_router.message(Command("contacts"))
 async def policy_cmd(message: Message, session: AsyncSession):
-    should_stop = await stop_if_no_promo(
-        message=message,
-        session=session,
-    )
-    if should_stop:
+
+    if await stop_if_no_promo(message=message, session=session):
         return
 
     result = await session.execute(

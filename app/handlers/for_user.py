@@ -24,8 +24,7 @@ from app.db.config import session_maker
 from app.posting.resolver import resolve_channel_context
 from app.posting.state import is_new_post
 from app.posting.dispatcher import dispatch_post
-# from app.openai_assistant.client import ask_assistant
-# from app.openai_assistant.queue import openai_queue
+from app.openai_assistant.responses_client import ask_responses_api
 
 
 
@@ -58,24 +57,13 @@ async def cmd_start(message: Message, bot: Bot, session: AsyncSession):
 
 
 
+
 # ОБРАБОТЧИКИ
-
-# Хендлер для определения id гифки
-# @for_user_router.message()
-# async def catch_animation(message: Message):
-#     if message.animation:
-#         await message.answer(
-#             f"file_id:\n<code>{message.animation.file_id}</code>"
-#         )
-
-
-
-
-
 @for_user_router.message(~(F.text))
 async def filter(message: Message):
     await message.delete()
     await message.answer("Запросы AI консультанту только в формате текста")
+
 
 
 
@@ -90,9 +78,13 @@ async def activation(call: CallbackQuery):
     await call.answer()
 
 
+
+
 @for_user_router.callback_query(F.data == "pay_access")
 async def pay_access(call: CallbackQuery):
     await call.answer("Увы, способ оплаты временно не доступен", show_alert=True)
+
+
 
 
 @for_user_router.callback_query(F.data == "enter_promo")
@@ -103,6 +95,8 @@ async def enter_promo(call: CallbackQuery, state: FSMContext):
 
     await call.message.answer("Введите код активации текстом:")
     await call.answer()
+
+
 
 
 @for_user_router.message(StateFilter(ActivationState.waiting_for_promo_code), F.text)
@@ -147,7 +141,7 @@ async def process_promo_code(
         )
 
 
-######################### Обработка запросов пользователя к AI #########################
+######################### Обработка запросов пользователя к AI Responses API #########################
 
 
 #Функция, чтобы крутился индикатор "печатает"
@@ -158,170 +152,156 @@ async def send_typing(bot, chat_id, stop_event):
 
 @for_user_router.message(F.text)
 async def handle_text(message: Message, session: AsyncSession, bot: Bot):
-    should_stop = await stop_if_no_promo(
-        message=message,
-        session=session,
-    )
-    if should_stop:
+    if await stop_if_no_promo(message=message, session=session):
         return
 
     result = await session.execute(select(User).where(User.telegram_id == message.from_user.id))
     user = result.scalar_one_or_none()
+
     if user.requests_left == 0:
         await message.answer(f"🚫 У вас закончились запросы\n\nПожалуйста, пополните баланс"
                              f"\n\n<a href='https://telegra.ph/pvapavp-07-04'>"
                              "(Почему бот стал платным?)</a>", reply_markup=kb.pay)
-
-    if not openai_queue:
-        await message.answer("⚠️ Ассистент временно недоступен\n\nПовторите пожалуйста запрос позже")
         return
 
+    # Стартуем фоновый "набор текста"
+    stop_event = asyncio.Event()
+    typing_task = asyncio.create_task(send_typing(bot, message.chat.id, stop_event))
+
+    typing_msg = await message.answer("Ваш запрос обрабатывается и готовится ответ 💬")
+
     try:
-        typing_msg = await message.answer("Ваш запрос обрабатывается и готовиться ответ 💬") # Отправляем текст
-
-        # 🟡 Обновляем статус запроса
-        user.request_status = "pending"
-        await session.commit()
-
-        # Стартуем фоновый "набор текста"
-        stop_event = asyncio.Event()
-        typing_task = asyncio.create_task(send_typing(bot, message.chat.id, stop_event))
-
-        answer = await ask_assistant(
-            queue=openai_queue,
-            user_id=user.telegram_id,
-            thread_id=user.thread_id,
-            message=message.text
-        )
-
-        # Убираем индикаторы
-        stop_event.set()
-        typing_task.cancel()
-        await typing_msg.delete()
-
-
+        # 🔥 Вызов Responses API (запрос → ответ, без контекста)
+        answer = await ask_responses_api(message.text)
+        # Ответ пользователю от AI
         await message.answer(answer, parse_mode=ParseMode.MARKDOWN)
 
         # ✅ Запрос выполнен
         user.requests_left -= 1
-        user.request_status = "complete"
         await session.commit()
+
     except Exception as e:
-        await message.answer(f'⚠️ Ошибка при обработке запроса: {str(e)}\n\nЕсли эта ошибка повторится сообщите '
-                             f'пожалуйста об этом администратору нашего сервиса '
-                             f'<a href="https://t.me/RomanMo_admin">@RomanMo_admin</a>')
+        await message.answer(f'⚠️ Ошибка при обработке запроса из-за проблем с интернет-соединением: {str(e)}\n\n'
+                             f'Повторите пожалуйста запрос позже')
+    finally:
+        # Убираем индикаторы
+        stop_event.set()
+        typing_task.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await typing_task
+        await typing_msg.delete()
 
 
-#
-#
-# # Приём платежа
-#
-#
-# def generate_random_email():   # Генерируем случайную строку длиной 10 символов
-#     random_str = ''.join(random.choices(string.ascii_lowercase + string.digits, k=10))
-#     return f"{random_str}@yandex.ru"
-#
-# @for_user_router.callback_query(F.data.startswith("pay"))
-# async def process_payment(callback: CallbackQuery, bot: Bot, session: AsyncSession):
-#     telegram_id = callback.from_user.id
-#     amount_map = {
-#         "pay30": 30,
-#         "pay550": 550,
-#         "pay2500": 2500
-#     }
-#
-#     data_key = callback.data
-#     amount = amount_map.get(data_key)
-#     if not amount:
-#         await callback.answer("Неизвестная сумма", show_alert=True)
-#         return
-#
-#     return_url = f"https://t.me/{(await bot.me()).username}"
-#
-#
-#     # Получаем пользователя
-#     result = await session.execute(select(User).where(User.telegram_id == telegram_id))
-#     user = result.scalar_one_or_none()
-#     if not user:
-#         return
-#
-#     # Генерируем email, если он ещё не задан
-#     if not user.email or user.email == "idle":
-#         user.email = generate_random_email()
-#         await session.commit()
-#
-#     payment_payload = {
-#         "amount": {
-#             "value": f"{amount:.2f}",
-#             "currency": "RUB"
-#         },
-#         "confirmation": {
-#             "type": "redirect",
-#             "return_url": return_url
-#         },
-#         "capture": True,
-#         "description": f"Покупка на {amount}₽",
-#         "metadata": {
-#             "telegram_id": str(telegram_id)
-#         },
-#         "receipt": {
-#             "customer": {
-#                 "email": user.email
-#             },
-#             "items": [
-#                 {
-#                     "description": f"Покупка на {amount}₽",
-#                     "quantity": "1.00",
-#                     "amount": {
-#                         "value": f"{amount:.2f}",
-#                         "currency": "RUB"
-#                     },
-#                     "vat_code": 1
-#                 }
-#             ]
-#         }
-#     }
-#     def base64_auth():
-#         shop_id = os.getenv("YOOKASSA_SHOP_ID")
-#         secret = os.getenv("YOOKASSA_SECRET_KEY")
-#         raw = f"{shop_id}:{secret}".encode()
-#         return base64.b64encode(raw).decode()
-#
-#     headers = {
-#         "Authorization": f"Basic {base64_auth()}",
-#         "Content-Type": "application/json",
-#         "Idempotence-Key": str(uuid4())
-#     }
-#
-#     try:
-#         async with aiohttp.ClientSession() as session_http:
-#             async with session_http.post(
-#                 url="https://api.yookassa.ru/v3/payments",
-#                 json=payment_payload,
-#                 headers=headers
-#             ) as resp:
-#                 payment_response = await resp.json()
-#
-#         print("📦 Ответ от ЮKassa:", payment_response)
-#
-#         if "confirmation" not in payment_response:
-#             error_text = payment_response.get("description", "Нет поля confirmation")
-#             await callback.message.answer(f"❌ Ошибка ЮKassa: {error_text}")
-#             return
-#
-#         confirmation_url = payment_response["confirmation"]["confirmation_url"]
-#         await callback.message.answer(
-#             f'Вы приобретаете дополнительные запросы'
-#             f'\n\nПосле успешной оплаты, они отобразятся в разделе -> ⭐️ Баланс'
-#             f'\n\n<blockquote>Оплата производится через Yoomoney (cервис электронных платежей ПАО "Сбербанк")</blockquote>',
-#             reply_markup=payment_button_keyboard(confirmation_url)
-#         )
-#         await callback.answer()
-#
-#     except Exception as e:
-#         print("❌ Ошибка при создании платежа:", e)
-#         await callback.message.answer("Ошибка при попытке создать платёж. Подробности в логах.")
-#
+
+
+# Приём платежа
+
+
+def generate_random_email():   # Генерируем случайную строку длиной 10 символов для e-mail
+    random_str = ''.join(random.choices(string.ascii_lowercase + string.digits, k=10))
+    return f"{random_str}@yandex.ru"
+
+@for_user_router.callback_query(F.data.startswith("pay"))
+async def process_payment(callback: CallbackQuery, bot: Bot, session: AsyncSession):
+    telegram_id = callback.from_user.id
+    amount_map = {
+        "pay30": 30,
+        "pay550": 550,
+        "pay2500": 2500
+    }
+
+    data_key = callback.data
+    amount = amount_map.get(data_key)
+    if not amount:
+        await callback.answer("Неизвестная сумма", show_alert=True)
+        return
+
+    return_url = f"https://t.me/{(await bot.me()).username}"
+
+
+    # Получаем пользователя
+    result = await session.execute(select(User).where(User.telegram_id == telegram_id))
+    user = result.scalar_one_or_none()
+    if not user:
+        return
+
+    # Генерируем email, если он ещё не задан
+    if not user.email or user.email == "idle":
+        user.email = generate_random_email()
+        await session.commit()
+
+    payment_payload = {
+        "amount": {
+            "value": f"{amount:.2f}",
+            "currency": "RUB"
+        },
+        "confirmation": {
+            "type": "redirect",
+            "return_url": return_url
+        },
+        "capture": True,
+        "description": f"Покупка на {amount}₽",
+        "metadata": {
+            "telegram_id": str(telegram_id)
+        },
+        "receipt": {
+            "customer": {
+                "email": user.email
+            },
+            "items": [
+                {
+                    "description": f"Покупка на {amount}₽",
+                    "quantity": "1.00",
+                    "amount": {
+                        "value": f"{amount:.2f}",
+                        "currency": "RUB"
+                    },
+                    "vat_code": 1
+                }
+            ]
+        }
+    }
+    def base64_auth():
+        shop_id = os.getenv("YOOKASSA_SHOP_ID")
+        secret = os.getenv("YOOKASSA_SECRET_KEY")
+        raw = f"{shop_id}:{secret}".encode()
+        return base64.b64encode(raw).decode()
+
+    headers = {
+        "Authorization": f"Basic {base64_auth()}",
+        "Content-Type": "application/json",
+        "Idempotence-Key": str(uuid4())
+    }
+
+    try:
+        async with aiohttp.ClientSession() as session_http:
+            async with session_http.post(
+                url="https://api.yookassa.ru/v3/payments",
+                json=payment_payload,
+                headers=headers
+            ) as resp:
+                payment_response = await resp.json()
+
+        print("📦 Ответ от ЮKassa:", payment_response)
+
+        if "confirmation" not in payment_response:
+            error_text = payment_response.get("description", "Нет поля confirmation")
+            await callback.message.answer(f"❌ Ошибка ЮKassa: {error_text}")
+            return
+
+        confirmation_url = payment_response["confirmation"]["confirmation_url"]
+        await callback.message.answer(
+            f'Вы приобретаете дополнительные запросы'
+            f'\n\nПосле успешной оплаты, они отобразятся в разделе -> ⭐️ Баланс'
+            f'\n\n<blockquote>Оплата производится через Yoomoney (cервис электронных платежей ПАО "Сбербанк")</blockquote>',
+            reply_markup=payment_button_keyboard(confirmation_url)
+        )
+        await callback.answer()
+
+    except Exception as e:
+        print("❌ Ошибка при создании платежа:", e)
+        await callback.message.answer("Ошибка при попытке создать платёж. Подробности в логах.")
+
 #
 #
 # # Отправка сообщений из канала Mari
@@ -381,3 +361,15 @@ async def channel_post_handler(message: Message) -> None:
         context=context,
         message=message,
     )
+
+
+
+
+
+#Технический хендлер для определения id гифки
+# @for_user_router.message()
+# async def catch_animation(message: Message):
+#     if message.animation:
+#         await message.answer(
+#             f"file_id:\n<code>{message.animation.file_id}</code>"
+#         )

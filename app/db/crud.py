@@ -45,9 +45,9 @@ async def stop_if_no_promo(
     return True
 
 
-                                        ###  ###  ###  Для AI и БД ###  ###  ###
+                                        ###  ###  ###  Для БД ###  ###  ###
 
-# Получить пользователя или создать нового + создание thread через OpenAI API
+# Получить пользователя или создать нового
 async def get_or_create_user(session: AsyncSession, telegram_id: int, username: str | None,) -> User:
     # Проверка: есть ли пользователь
     result = await session.execute(select(User).where(User.telegram_id == telegram_id))
@@ -65,28 +65,8 @@ async def get_or_create_user(session: AsyncSession, telegram_id: int, username: 
         telegram_id=telegram_id,
         username=username,
         requests_left=1,
-        # thread_id=thread.id, # 👈 это будет вида thread_abc123...
         is_active=True,  # обязательно активируем нового
     )
-
-    # if user:
-    #     # Создаём новый thread через OpenAI API
-    #     thread = await client.beta.threads.create()
-    #     if not thread or not thread.id:
-    #         await message.answer("❌ Не удалось обновить сессию. Попробуйте позже.")
-    #         raise RuntimeError("❌ Не удалось создать thread через OpenAI API")
-    #
-    #     # Обновляем thread_id у существующего пользователя
-    #     user.thread_id = thread.id
-    #     await session.commit()
-    #     await session.refresh(user)
-    #     return user
-    #
-    # # Новый пользователь → создать thread через OpenAI
-    # thread = await client.beta.threads.create()
-    # if not thread or not thread.id:
-    #     await message.answer("❌ Не удалось обновить сессию. Попробуйте позже.")
-    #     raise RuntimeError("❌ Не удалось создать thread через OpenAI API")
 
     session.add(new_user)
     await session.commit()
@@ -96,15 +76,6 @@ async def get_or_create_user(session: AsyncSession, telegram_id: int, username: 
 
 
 
-# Уменьшить количество оставшихся запросов к AI
-async def decrement_requests(session: AsyncSession, telegram_id: int) -> None:
-    await session.execute(
-        update(User)
-        .where(User.telegram_id == telegram_id)
-        .values(requests_left=User.requests_left - 1)
-    )
-    await session.commit()
-
 # Увеличить количество запросов к AI
 async def increment_requests(session: AsyncSession, telegram_id: int, count: int):
     await session.execute(
@@ -113,25 +84,3 @@ async def increment_requests(session: AsyncSession, telegram_id: int, count: int
         .values(requests_left=User.requests_left + count)
     )
     await session.commit()
-
-
-
-# на случай перезагрузки/сбоя бота при отправки запроса к AI
-async def notify_pending_users(bot: Bot, session_factory):
-    async with session_factory() as session:
-        result = await session.execute(select(User).where(User.request_status == 'pending'))
-        users = result.scalars().all()
-        for user in users:
-            try:
-                await bot.send_message(user.telegram_id, f"⚠️ Извините, сбой на сервере"
-                                                         f"\n\nПредыдущий запрос не был "
-                                                         "обработан. Повторите его пожалуйста")
-                user.status = 'error'
-            except Exception as e:
-                print(f"Ошибка при уведомлении пользователя {user.telegram_id}: {e}")
-        await session.commit()
-
-
-
-
-
