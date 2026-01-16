@@ -5,6 +5,7 @@ import string
 from uuid import uuid4
 import aiohttp
 import base64
+import contextlib
 
 from aiogram import F, Router, types, Bot
 from aiogram.filters import CommandStart, StateFilter
@@ -160,8 +161,8 @@ async def handle_text(message: Message, session: AsyncSession, bot: Bot):
 
     if user.requests_left == 0:
         await message.answer(f"🚫 У вас закончились запросы\n\nПожалуйста, пополните баланс"
-                             f"\n\n<a href='https://telegra.ph/pvapavp-07-04'>"
-                             "(Почему бот стал платным?)</a>", reply_markup=kb.pay)
+                             f"\n\n<a href='https://telegra.ph/AI-konsultant-rabotaet-na-platnoj-platforme-httpsplatformopenaicom-01-16'>"
+                             "(Почему запросы платные?)</a>", reply_markup=kb.pay)
         return
 
     # Стартуем фоновый "набор текста"
