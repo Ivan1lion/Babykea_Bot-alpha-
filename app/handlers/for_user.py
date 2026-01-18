@@ -288,8 +288,8 @@ async def process_payment(callback: CallbackQuery, bot: Bot, session: AsyncSessi
         confirmation_url = payment_response["confirmation"]["confirmation_url"]
         await callback.message.answer(
             f'Вы приобретаете дополнительные запросы'
-            f'\n\nПосле успешной оплаты, они отобразятся в разделе -> ⭐️ Баланс'
-            f'\n\n<blockquote>Оплата производится через Yoomoney (cервис электронных платежей ПАО "Сбербанк")</blockquote>',
+            f'\n\nПосле успешной оплаты, они отобразятся в разделе -> 🤖 AI-консультант'
+            f'\n\n<blockquote>Оплата производится через Yoomoney (Юkassa) - cервис безопасных платежей ПАО "Сбербанк"</blockquote>',
             reply_markup=payment_button_keyboard(confirmation_url)
         )
         await callback.answer()

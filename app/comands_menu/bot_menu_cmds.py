@@ -149,19 +149,45 @@ async def policy_cmd(message: Message, session: AsyncSession):
         await message.answer("Магазин не найден")
         return
 
+    # 🔹 Спец-логика для Babykea
+    if magazine.name == "Babykea":
+        await message.answer_photo(
+            photo="https://i.postimg.cc/zBSgzjss/i.jpg",
+            caption=(
+                "🏆 <b>Магазины с высокой репутацией</b>\n\n"
+                "• Первая коляска\n"
+                "• Boan Baby\n"
+                "• Lapsi"
+            ),
+        )
+        return
+
+    # 🔹 Обычные магазины
     text_parts = [
-        f"<blockquote>{magazine.name}</blockquote>\n\n"
-        f"📍 Город: {magazine.city}\n"
-        f"🏠 Адрес: {magazine.address}\n"
-        f"🌐 Сайт: <a href='{magazine.url_website}'>{magazine.name_website}</a>\n",
+        f"<blockquote>{magazine.name}</blockquote>\n",
+        f"📍 Город: {magazine.city}",
+        f"🏠 Адрес: {magazine.address}",
+        f"🌐 Сайт: <a href='{magazine.url_website}'>{magazine.name_website}</a>",
     ]
+
     if magazine.username_magazine:
         text_parts.append(f"💬 Telegram: {magazine.username_magazine}")
 
-    await message.answer(
-        "\n".join(text_parts),
-        reply_markup=magazine_map_kb(magazine.map_url),
-    )
+    text = "\n".join(text_parts)
+
+    if magazine.photo:
+        await message.answer_photo(
+            photo=magazine.photo,
+            caption=text,
+            reply_markup=magazine_map_kb(magazine.map_url),
+        )
+    else:
+        await message.answer(
+            text,
+            reply_markup=magazine_map_kb(magazine.map_url),
+        )
+
+
 
 
 @menu_cmds_router.message(Command("offer"))
