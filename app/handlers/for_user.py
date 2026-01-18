@@ -26,6 +26,7 @@ from app.posting.resolver import resolve_channel_context
 from app.posting.state import is_new_post
 from app.posting.dispatcher import dispatch_post
 from app.openai_assistant.responses_client import ask_responses_api
+from app.payments.pay_config import PAYMENTS
 
 
 
@@ -81,9 +82,9 @@ async def activation(call: CallbackQuery):
 
 
 
-@for_user_router.callback_query(F.data == "pay_access")
-async def pay_access(call: CallbackQuery):
-    await call.answer("Увы, способ оплаты временно не доступен", show_alert=True)
+# @for_user_router.callback_query(F.data == "pay_access")
+# async def pay_access(call: CallbackQuery):
+#     await call.answer("Увы, способ оплаты временно не доступен", show_alert=True)
 
 
 
@@ -198,22 +199,15 @@ async def handle_text(message: Message, session: AsyncSession, bot: Bot):
 
 ######################### Приём платежа #########################
 
-
 @for_user_router.callback_query(F.data.startswith("pay"))
 async def process_payment(callback: CallbackQuery, bot: Bot, session: AsyncSession):
     telegram_id = callback.from_user.id
-    amount_map = {
-        "pay29": 1,
-        "pay950": 950,
-        "pay190": 190
-    }
-
-    data_key = callback.data
-    amount = amount_map.get(data_key)
-    if not amount:
-        await callback.answer("Неизвестная сумма", show_alert=True)
+    cfg = PAYMENTS.get(callback.data)
+    if not cfg:
+        await callback.answer("Неизвестный тариф", show_alert=True)
         return
 
+    amount = cfg["amount"]
     return_url = f"https://t.me/{(await bot.me()).username}"
 
 
@@ -226,23 +220,23 @@ async def process_payment(callback: CallbackQuery, bot: Bot, session: AsyncSessi
     payment_payload = {
         "amount": {
             "value": f"{amount:.2f}",
-            "currency": "RUB"
+            "currency": "RUB",
         },
         "confirmation": {
             "type": "redirect",
-            "return_url": return_url
+            "return_url": return_url,
         },
         "capture": True,
-        "description": f"Доступ к функционалу бота на сумму {amount} ₽",
+        "description": f"Оплата на сумму {amount} ₽",
         "metadata": {
             "telegram_id": str(telegram_id),
-            "payment_type": "bot_access",
+            "payment_type": callback.data,
         },
         "receipt": {
             "customer": {
-                "email": "tobedrive@yandex.ru"  # 🔴 ТВОЙ сервисный email
+                "email": "tobedrive@yandex.ru", # 🔴 ТВОЙ сервисный email
             },
-            "tax_system_code": 2,  # 🔴 НПД (самозанятый)
+            "tax_system_code": 2, # 🔴 НПД (самозанятый)
             "items": [
                 {
                     "description": "Доступ к функционалу Telegram-бота",
@@ -250,12 +244,12 @@ async def process_payment(callback: CallbackQuery, bot: Bot, session: AsyncSessi
                     "measure": "service",
                     "amount": {
                         "value": f"{amount:.2f}",
-                        "currency": "RUB"
+                        "currency": "RUB",
                     },
-                    "vat_code": 1,  # без НДС
+                    "vat_code": 1,
                 }
-            ]
-        }
+            ],
+        },
     }
     def base64_auth():
         shop_id = os.getenv("YOOKASSA_SHOP_ID")
@@ -287,16 +281,117 @@ async def process_payment(callback: CallbackQuery, bot: Bot, session: AsyncSessi
 
         confirmation_url = payment_response["confirmation"]["confirmation_url"]
         await callback.message.answer(
-            f'Вы приобретаете дополнительные запросы'
-            f'\n\nПосле успешной оплаты, они отобразятся в разделе -> 🤖 AI-консультант'
-            f'\n\n<blockquote>Оплата производится через Yoomoney (Юkassa) - cервис безопасных платежей ПАО "Сбербанк"</blockquote>',
-            reply_markup=payment_button_keyboard(confirmation_url)
+            cfg["message"],
+            reply_markup=payment_button_keyboard(confirmation_url),
         )
         await callback.answer()
 
     except Exception as e:
         print("❌ Ошибка при создании платежа:", e)
-        await callback.message.answer("Ошибка при попытке создать платёж. Подробности в логах.")
+        await callback.message.answer("Ошибка при создании платежа. Подробности в логах.")
+
+
+
+
+
+# @for_user_router.callback_query(F.data.startswith("pay"))
+# async def process_payment(callback: CallbackQuery, bot: Bot, session: AsyncSession):
+#     telegram_id = callback.from_user.id
+#     amount_map = {
+#         "pay29": 1,
+#         "pay950": 950,
+#         "pay190": 190
+#     }
+#
+#     data_key = callback.data
+#     amount = amount_map.get(data_key)
+#     if not amount:
+#         await callback.answer("Неизвестная сумма", show_alert=True)
+#         return
+#
+#     return_url = f"https://t.me/{(await bot.me()).username}"
+#
+#
+#     # Получаем пользователя
+#     result = await session.execute(select(User).where(User.telegram_id == telegram_id))
+#     user = result.scalar_one_or_none()
+#     if not user:
+#         return
+#
+#     payment_payload = {
+#         "amount": {
+#             "value": f"{amount:.2f}",
+#             "currency": "RUB"
+#         },
+#         "confirmation": {
+#             "type": "redirect",
+#             "return_url": return_url
+#         },
+#         "capture": True,
+#         "description": f"Доступ к функционалу бота на сумму {amount} ₽",
+#         "metadata": {
+#             "telegram_id": str(telegram_id),
+#             "payment_type": "bot_access",
+#         },
+#         "receipt": {
+#             "customer": {
+#                 "email": "tobedrive@yandex.ru"  # 🔴 ТВОЙ сервисный email
+#             },
+#             "tax_system_code": 2,  # 🔴 НПД (самозанятый)
+#             "items": [
+#                 {
+#                     "description": "Доступ к функционалу Telegram-бота",
+#                     "quantity": "1.00",
+#                     "measure": "service",
+#                     "amount": {
+#                         "value": f"{amount:.2f}",
+#                         "currency": "RUB"
+#                     },
+#                     "vat_code": 1,  # без НДС
+#                 }
+#             ]
+#         }
+#     }
+#     def base64_auth():
+#         shop_id = os.getenv("YOOKASSA_SHOP_ID")
+#         secret = os.getenv("YOOKASSA_SECRET_KEY")
+#         raw = f"{shop_id}:{secret}".encode()
+#         return base64.b64encode(raw).decode()
+#
+#     headers = {
+#         "Authorization": f"Basic {base64_auth()}",
+#         "Content-Type": "application/json",
+#         "Idempotence-Key": str(uuid4())
+#     }
+#
+#     try:
+#         async with aiohttp.ClientSession() as session_http:
+#             async with session_http.post(
+#                 url="https://api.yookassa.ru/v3/payments",
+#                 json=payment_payload,
+#                 headers=headers
+#             ) as resp:
+#                 payment_response = await resp.json()
+#
+#         print("📦 Ответ от ЮKassa:", payment_response)
+#
+#         if "confirmation" not in payment_response:
+#             error_text = payment_response.get("description", "Нет поля confirmation")
+#             await callback.message.answer(f"❌ Ошибка ЮKassa: {error_text}")
+#             return
+#
+#         confirmation_url = payment_response["confirmation"]["confirmation_url"]
+#         await callback.message.answer(
+#             f'Вы приобретаете дополнительные запросы'
+#             f'\n\nПосле успешной оплаты, они отобразятся в разделе -> 🤖 AI-консультант'
+#             f'\n\n<blockquote>Оплата производится через Yoomoney (Юkassa) - cервис безопасных платежей ПАО "Сбербанк"</blockquote>',
+#             reply_markup=payment_button_keyboard(confirmation_url)
+#         )
+#         await callback.answer()
+#
+#     except Exception as e:
+#         print("❌ Ошибка при создании платежа:", e)
+#         await callback.message.answer("Ошибка при попытке создать платёж. Подробности в логах.")
 
 #
 #
