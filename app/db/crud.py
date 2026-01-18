@@ -6,8 +6,7 @@ from aiogram.types import Message
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from openai import AsyncOpenAI
-from .models import User
-from app.db.models import ChannelState, MagazineChannel, MyChannel, User
+from app.db.models import ChannelState, MagazineChannel, MyChannel, User, Payment
 
 
 
@@ -76,6 +75,27 @@ async def get_or_create_user(session: AsyncSession, telegram_id: int, username: 
 
 
 
+                                     ###  ###  ###  Функции для платежей ###  ###  ###
+async def get_payment(session: AsyncSession, payment_id: str):
+    result = await session.execute(select(Payment).where(Payment.payment_id == payment_id))
+    return result.scalar_one_or_none()
+
+
+
+async def create_payment(session: AsyncSession, payment_id: str, telegram_id: int, amount: float, receipt_url: str | None):
+    payment = Payment(
+        payment_id=payment_id,
+        telegram_id=telegram_id,
+        amount=amount,
+        receipt_url=receipt_url,
+        processed=True
+    )
+    session.add(payment)
+    await session.commit()
+    return payment
+
+
+
 # Увеличить количество запросов к AI
 async def increment_requests(session: AsyncSession, telegram_id: int, count: int):
     await session.execute(
@@ -84,3 +104,20 @@ async def increment_requests(session: AsyncSession, telegram_id: int, count: int
         .values(requests_left=User.requests_left + count)
     )
     await session.commit()
+
+
+
+# Фоновая задача для отправки чека
+async def send_receipt_async(telegram_id: int, receipt_url: str):
+    from app.main import bot
+    try:
+        await bot.send_message(
+            chat_id=telegram_id,
+            text=(
+                "✅ Оплата прошла успешно\n\n"
+                f"🧾 Ваш электронный чек:\n{receipt_url}"
+            )
+        )
+    except Exception as e:
+        # логирование ошибки, можно повторить позже
+        print(f"❌ Ошибка отправки чека Telegram: {e}")

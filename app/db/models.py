@@ -1,7 +1,7 @@
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 from sqlalchemy.ext.asyncio import AsyncAttrs
 from sqlalchemy.sql import func
-from sqlalchemy import BigInteger, Integer, String, DateTime, ForeignKey, Boolean
+from sqlalchemy import BigInteger, Integer, String, DateTime, ForeignKey, Boolean, Numeric, Column
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.ext.mutable import MutableDict
 from typing import Optional
@@ -30,6 +30,7 @@ class Magazine(Base):
     address: Mapped[str] = mapped_column(String(255), nullable=True)
     name_website: Mapped[str] = mapped_column(String(255), nullable=True)
     url_website: Mapped[str] = mapped_column(String(255), nullable=True)
+    photo: Mapped[str] = mapped_column(String(500), nullable=True)
     map_url: Mapped[str] = mapped_column(String(500), nullable=True)
     username_magazine: Mapped[str] = mapped_column(String(150), nullable=True)
 
@@ -56,6 +57,7 @@ class User(Base):
         nullable=True
     )
     user_type: Mapped[str] = mapped_column(String(150), nullable=True)
+    stroller_condition: Mapped[str] = mapped_column(String(50), nullable=True)
     requests_left: Mapped[int] = mapped_column(Integer, default=1)
     is_active: Mapped[bool] = mapped_column(default=True)
 
@@ -152,4 +154,15 @@ class MyPost(Base):
     post_id: Mapped[int] = mapped_column(nullable=False)
 
 
+
+#7 Таблица оплаты для решения дублей webhook
+class Payment(Base):
+    __tablename__ = "payments"
+
+    id = Column(Integer, primary_key=True)
+    payment_id = Column(String, unique=True, nullable=False)  # id из YooKassa
+    telegram_id = Column(Integer, nullable=False)
+    amount = Column(Numeric(10, 2), nullable=False)
+    receipt_url = Column(String, nullable=True)
+    processed = Column(Boolean, default=False)
 

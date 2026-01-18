@@ -160,7 +160,8 @@ async def handle_text(message: Message, session: AsyncSession, bot: Bot):
     user = result.scalar_one_or_none()
 
     if user.requests_left == 0:
-        await message.answer(f"🚫 У вас закончились запросы\n\nПожалуйста, пополните баланс"
+        await message.answer(f"🚫 У вас закончились запросы\n\n"
+                             f"Чтобы продолжить поиск, подбор и сравнение колясок - пополните запросы"
                              f"\n\n<a href='https://telegra.ph/AI-konsultant-rabotaet-na-platnoj-platforme-httpsplatformopenaicom-01-16'>"
                              "(Почему запросы платные?)</a>", reply_markup=kb.pay)
         return
@@ -195,20 +196,16 @@ async def handle_text(message: Message, session: AsyncSession, bot: Bot):
 
 
 
-# Приём платежа
+######################### Приём платежа #########################
 
-
-def generate_random_email():   # Генерируем случайную строку длиной 10 символов для e-mail
-    random_str = ''.join(random.choices(string.ascii_lowercase + string.digits, k=10))
-    return f"{random_str}@yandex.ru"
 
 @for_user_router.callback_query(F.data.startswith("pay"))
 async def process_payment(callback: CallbackQuery, bot: Bot, session: AsyncSession):
     telegram_id = callback.from_user.id
     amount_map = {
-        "pay30": 30,
-        "pay550": 550,
-        "pay2500": 2500
+        "pay29": 1,
+        "pay950": 950,
+        "pay190": 190
     }
 
     data_key = callback.data
@@ -226,11 +223,6 @@ async def process_payment(callback: CallbackQuery, bot: Bot, session: AsyncSessi
     if not user:
         return
 
-    # Генерируем email, если он ещё не задан
-    if not user.email or user.email == "idle":
-        user.email = generate_random_email()
-        await session.commit()
-
     payment_payload = {
         "amount": {
             "value": f"{amount:.2f}",
@@ -241,23 +233,26 @@ async def process_payment(callback: CallbackQuery, bot: Bot, session: AsyncSessi
             "return_url": return_url
         },
         "capture": True,
-        "description": f"Покупка на {amount}₽",
+        "description": f"Доступ к функционалу бота на сумму {amount} ₽",
         "metadata": {
-            "telegram_id": str(telegram_id)
+            "telegram_id": str(telegram_id),
+            "payment_type": "bot_access",
         },
         "receipt": {
             "customer": {
-                "email": user.email
+                "email": "tobedrive@yandex.ru"  # 🔴 ТВОЙ сервисный email
             },
+            "tax_system_code": 2,  # 🔴 НПД (самозанятый)
             "items": [
                 {
-                    "description": f"Покупка на {amount}₽",
+                    "description": "Доступ к функционалу Telegram-бота",
                     "quantity": "1.00",
+                    "measure": "service",
                     "amount": {
                         "value": f"{amount:.2f}",
                         "currency": "RUB"
                     },
-                    "vat_code": 1
+                    "vat_code": 1,  # без НДС
                 }
             ]
         }
