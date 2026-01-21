@@ -1,6 +1,7 @@
 import os
 import asyncio
 
+from decimal import Decimal
 from aiogram import Bot
 from aiogram.types import Message
 from sqlalchemy import select, update
@@ -76,24 +77,85 @@ async def get_or_create_user(session: AsyncSession, telegram_id: int, username: 
 
 
                                      ###  ###  ###  Функции для платежей ###  ###  ###
-async def get_payment(session: AsyncSession, payment_id: str):
-    result = await session.execute(select(Payment).where(Payment.payment_id == payment_id))
+
+
+async def update_receipt_url(
+    session: AsyncSession,
+    payment_id: str,
+    receipt_url: str,
+):
+    await session.execute(
+        update(Payment)
+        .where(Payment.payment_id == payment_id)
+        .values(receipt_url=receipt_url)
+    )
+    await session.commit()
+
+
+async def get_payment_by_payment_id(
+    session: AsyncSession, payment_id: str
+) -> Payment | None:
+    result = await session.execute(
+        select(Payment).where(Payment.payment_id == payment_id)
+    )
     return result.scalar_one_or_none()
 
 
-
-async def create_payment(session: AsyncSession, payment_id: str, telegram_id: int, amount: float, receipt_url: str | None):
+async def create_pending_payment(
+    session: AsyncSession,
+    payment_id: str,
+    telegram_id: int,
+    amount,
+):
     payment = Payment(
         payment_id=payment_id,
         telegram_id=telegram_id,
         amount=amount,
-        receipt_url=receipt_url,
-        processed=True
+        status="pending",
     )
     session.add(payment)
     await session.commit()
     return payment
 
+
+async def mark_payment_succeeded(
+    session: AsyncSession,
+    payment_id: str,
+    receipt_url: str | None,
+):
+    await session.execute(
+        update(Payment)
+        .where(Payment.payment_id == payment_id)
+        .values(
+            status="succeeded",
+            receipt_url=receipt_url,
+        )
+    )
+    await session.commit()
+
+
+async def mark_payment_canceled(
+    session: AsyncSession,
+    payment_id: str,
+):
+    await session.execute(
+        update(Payment)
+        .where(Payment.payment_id == payment_id)
+        .values(status="canceled")
+    )
+    await session.commit()
+
+
+async def mark_payment_failed(
+    session: AsyncSession,
+    payment_id: str,
+):
+    await session.execute(
+        update(Payment)
+        .where(Payment.payment_id == payment_id)
+        .values(status="failed")
+    )
+    await session.commit()
 
 
 # Увеличить количество запросов к AI
@@ -107,17 +169,4 @@ async def increment_requests(session: AsyncSession, telegram_id: int, count: int
 
 
 
-# Фоновая задача для отправки чека
-async def send_receipt_async(telegram_id: int, receipt_url: str):
-    from app.main import bot
-    try:
-        await bot.send_message(
-            chat_id=telegram_id,
-            text=(
-                "✅ Оплата прошла успешно\n\n"
-                f"🧾 Ваш электронный чек:\n{receipt_url}"
-            )
-        )
-    except Exception as e:
-        # логирование ошибки, можно повторить позже
-        print(f"❌ Ошибка отправки чека Telegram: {e}")
+

@@ -85,6 +85,7 @@ async def main():
 
     # 🌐 Создаём веб-приложение
     app = web.Application()
+    app["bot"] = bot
 
     async def health(request):
         return web.Response(text="ok")  # для проверки доступности контейнера и для Caddy

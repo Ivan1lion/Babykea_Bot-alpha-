@@ -6,6 +6,8 @@ from uuid import uuid4
 import aiohttp
 import base64
 import contextlib
+import logging
+
 
 from aiogram import F, Router, types, Bot
 from aiogram.filters import CommandStart, StateFilter
@@ -15,12 +17,13 @@ from aiogram.fsm.state import StatesGroup, State
 from aiogram.fsm.context import FSMContext
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from decimal import Decimal
 
 
 import app.handlers.keyboards as kb
 from app.handlers.keyboards import payment_button_keyboard
-from app.db.crud import get_or_create_user, stop_if_no_promo
-from app.db.models import User, MagazineChannel, ChannelState, Magazine
+from app.db.crud import get_or_create_user, stop_if_no_promo, create_pending_payment
+from app.db.models import User, MagazineChannel, ChannelState, Magazine, Payment
 from app.db.config import session_maker
 from app.posting.resolver import resolve_channel_context
 from app.posting.state import is_new_post
@@ -31,7 +34,7 @@ from app.payments.pay_config import PAYMENTS
 
 
 for_user_router = Router()
-
+logger = logging.getLogger(__name__)
 # channel = int(os.getenv("CHANNEL_ID"))
 
 class ActivationState(StatesGroup):
@@ -80,11 +83,6 @@ async def activation(call: CallbackQuery):
     await call.answer()
 
 
-
-
-# @for_user_router.callback_query(F.data == "pay_access")
-# async def pay_access(call: CallbackQuery):
-#     await call.answer("Увы, способ оплаты временно не доступен", show_alert=True)
 
 
 
@@ -198,11 +196,15 @@ async def handle_text(message: Message, session: AsyncSession, bot: Bot):
 
 
 ######################### Приём платежа #########################
-
 @for_user_router.callback_query(F.data.startswith("pay"))
-async def process_payment(callback: CallbackQuery, bot: Bot, session: AsyncSession):
+async def process_payment(
+    callback: CallbackQuery,
+    bot: Bot,
+    session: AsyncSession,
+):
     telegram_id = callback.from_user.id
     cfg = PAYMENTS.get(callback.data)
+
     if not cfg:
         await callback.answer("Неизвестный тариф", show_alert=True)
         return
@@ -210,13 +212,15 @@ async def process_payment(callback: CallbackQuery, bot: Bot, session: AsyncSessi
     amount = cfg["amount"]
     return_url = f"https://t.me/{(await bot.me()).username}"
 
-
-    # Получаем пользователя
-    result = await session.execute(select(User).where(User.telegram_id == telegram_id))
+    # ---------- проверяем пользователя ----------
+    result = await session.execute(
+        select(User).where(User.telegram_id == telegram_id)
+    )
     user = result.scalar_one_or_none()
     if not user:
         return
 
+    # ---------- payload для YooKassa ----------
     payment_payload = {
         "amount": {
             "value": f"{amount:.2f}",
@@ -234,9 +238,9 @@ async def process_payment(callback: CallbackQuery, bot: Bot, session: AsyncSessi
         },
         "receipt": {
             "customer": {
-                "email": "tobedrive@yandex.ru", # 🔴 ТВОЙ сервисный email
+                "email": "tobedrive@yandex.ru",
             },
-            "tax_system_code": 2, # 🔴 НПД (самозанятый)
+            "tax_system_code": 2,
             "items": [
                 {
                     "description": "Доступ к функционалу Telegram-бота",
@@ -251,44 +255,172 @@ async def process_payment(callback: CallbackQuery, bot: Bot, session: AsyncSessi
             ],
         },
     }
+
+    # ---------- auth ----------
     def base64_auth():
-        shop_id = os.getenv("YOOKASSA_SHOP_ID")
-        secret = os.getenv("YOOKASSA_SECRET_KEY")
-        raw = f"{shop_id}:{secret}".encode()
-        return base64.b64encode(raw).decode()
+        raw = f"{os.getenv('YOOKASSA_SHOP_ID')}:{os.getenv('YOOKASSA_SECRET_KEY')}"
+        return base64.b64encode(raw.encode()).decode()
 
     headers = {
         "Authorization": f"Basic {base64_auth()}",
         "Content-Type": "application/json",
-        "Idempotence-Key": str(uuid4())
+        "Idempotence-Key": str(uuid4()),
     }
 
     try:
-        async with aiohttp.ClientSession() as session_http:
-            async with session_http.post(
-                url="https://api.yookassa.ru/v3/payments",
+        async with aiohttp.ClientSession() as http:
+            async with http.post(
+                "https://api.yookassa.ru/v3/payments",
                 json=payment_payload,
-                headers=headers
+                headers=headers,
             ) as resp:
                 payment_response = await resp.json()
 
         print("📦 Ответ от ЮKassa:", payment_response)
 
         if "confirmation" not in payment_response:
-            error_text = payment_response.get("description", "Нет поля confirmation")
+            error_text = payment_response.get("description", "Нет confirmation")
             await callback.message.answer(f"❌ Ошибка ЮKassa: {error_text}")
             return
 
+        payment_id = payment_response["id"]
         confirmation_url = payment_response["confirmation"]["confirmation_url"]
+
+        # ===================== 🔴 ВАЖНО: ДОБАВЛЕНО =====================
+        # сохраняем PENDING платёж в БД
+        await create_pending_payment(
+            session=session,
+            payment_id=payment_id,
+            telegram_id=telegram_id,
+            amount=amount,
+        )
+        # ===============================================================
+
         await callback.message.answer(
             cfg["message"],
             reply_markup=payment_button_keyboard(confirmation_url),
         )
         await callback.answer()
 
-    except Exception as e:
-        print("❌ Ошибка при создании платежа:", e)
-        await callback.message.answer("Ошибка при создании платежа. Подробности в логах.")
+    except Exception:
+        logger.exception("Ошибка при создании платежа")
+        await callback.message.answer(
+            "❌ Ошибка при создании платежа. Попробуйте позже."
+        )
+
+
+
+
+# @for_user_router.callback_query(F.data.startswith("pay"))
+# async def process_payment(
+#     callback: CallbackQuery,
+#     bot: Bot,
+#     session: AsyncSession,
+# ):
+#     telegram_id = callback.from_user.id
+#     cfg = PAYMENTS.get(callback.data)
+#
+#     if not cfg:
+#         await callback.answer("Неизвестный тариф", show_alert=True)
+#         return
+#
+#     amount = cfg["amount"]
+#     return_url = f"https://t.me/{(await bot.me()).username}"
+#
+#     # ---------- проверяем пользователя ----------
+#     result = await session.execute(
+#         select(User).where(User.telegram_id == telegram_id)
+#     )
+#     user = result.scalar_one_or_none()
+#     if not user:
+#         return
+#
+#     # ---------- payload для YooKassa ----------
+#     payment_payload = {
+#         "amount": {
+#             "value": f"{amount:.2f}",
+#             "currency": "RUB",
+#         },
+#         "confirmation": {
+#             "type": "redirect",
+#             "return_url": return_url,
+#         },
+#         "capture": True,
+#         "description": f"Оплата на сумму {amount} ₽",
+#         "metadata": {
+#             "telegram_id": str(telegram_id),
+#             "payment_type": callback.data,
+#         },
+#         "receipt": {
+#             "customer": {
+#                 "email": "tobedrive@yandex.ru",
+#             },
+#             "tax_system_code": 2,
+#             "items": [
+#                 {
+#                     "description": "Доступ к функционалу Telegram-бота",
+#                     "quantity": "1.00",
+#                     "measure": "service",
+#                     "amount": {
+#                         "value": f"{amount:.2f}",
+#                         "currency": "RUB",
+#                     },
+#                     "vat_code": 1,
+#                 }
+#             ],
+#         },
+#     }
+#
+#     # ---------- auth ----------
+#     def base64_auth():
+#         raw = f"{os.getenv('YOOKASSA_SHOP_ID')}:{os.getenv('YOOKASSA_SECRET_KEY')}"
+#         return base64.b64encode(raw.encode()).decode()
+#
+#     headers = {
+#         "Authorization": f"Basic {base64_auth()}",
+#         "Content-Type": "application/json",
+#         "Idempotence-Key": str(uuid4()),
+#     }
+#
+#     try:
+#         async with aiohttp.ClientSession() as http:
+#             async with http.post(
+#                 "https://api.yookassa.ru/v3/payments",
+#                 json=payment_payload,
+#                 headers=headers,
+#             ) as resp:
+#                 payment_response = await resp.json()
+#
+#         print("📦 Ответ от ЮKassa:", payment_response)
+#
+#         if "confirmation" not in payment_response:
+#             error_text = payment_response.get("description", "Нет confirmation")
+#             await callback.message.answer(f"❌ Ошибка ЮKassa: {error_text}")
+#             return
+#
+#         payment_id = payment_response["id"]
+#         confirmation_url = payment_response["confirmation"]["confirmation_url"]
+#
+#         # ===================== 🔴 сохраняем PENDING платёж в БД =====================
+#         await create_pending_payment(
+#             session=session,
+#             payment_id=payment_id,
+#             telegram_id=telegram_id,
+#             amount=amount,
+#         )
+#         # ===============================================================
+#
+#         await callback.message.answer(
+#             cfg["message"],
+#             reply_markup=payment_button_keyboard(confirmation_url),
+#         )
+#         await callback.answer()
+#
+#     except Exception:
+#         logger.exception("Ошибка при создании платежа")
+#         await callback.message.answer(
+#             "❌ Ошибка при создании платежа. Попробуйте позже."
+#         )
 
 
 
