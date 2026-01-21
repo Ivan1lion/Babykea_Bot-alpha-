@@ -294,6 +294,7 @@ async def process_payment(
             telegram_id=telegram_id,
             amount=amount,
         )
+        await session.commit()  # <--- ДОБАВЛЕН ЯВНЫЙ КОММИТ
         # ===============================================================
 
         await callback.message.answer(
