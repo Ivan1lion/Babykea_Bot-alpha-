@@ -1,5 +1,5 @@
 import logging
-import os  # Добавил для проверки ENV
+import os
 from aiohttp import web
 from decimal import Decimal
 
@@ -20,113 +20,131 @@ logger = logging.getLogger(__name__)
 
 async def yookassa_webhook_handler(request: web.Request):
     bot = request.app["bot"]
-
-    # 🛠 Для тестов через ngrok (если DEBUG=True в .env, то пропускаем проверку IP)
-    # Убедись, что на проде DEBUG будет False или отсутствовать
     skip_ip_check = os.getenv("DEBUG") == "True"
 
     try:
-        # Проверка IP (если не включен режим отладки)
+        # 1. Проверка IP (безопасность)
         if not skip_ip_check:
             ip = get_peer_ip(request)
             if not ip or not is_yookassa_ip(ip):
                 return web.Response(status=403, text="Forbidden IP")
 
         data = await request.json()
-
         event = data.get("event")
         obj = data.get("object", {})
-        payment_id = obj.get("id")
+
+        # Определяем ID (в чеке он называется payment_id, в платеже - id)
+        if event == "receipt.registration":
+            payment_id = obj.get("payment_id")
+        else:
+            payment_id = obj.get("id")
 
         if not payment_id:
             return web.Response(text="no payment id")
 
+        # ---------------------------------------------------------------
+        # ЛОГИКА ОБРАБОТКИ
+        # ---------------------------------------------------------------
         async with session_maker() as session:
-            # 🔥 Открываем транзакцию. Она сама сделает commit в конце блока, если не будет ошибок.
-            async with session.begin():
+            async with session.begin():  # Одна транзакция
 
                 payment = await get_payment_by_payment_id(session, payment_id)
                 if not payment:
-                    # Если платеж не найден (например, не создался pending), можно создать его тут или ответить 200
-                    # Юкасса иногда шлет события очень быстро.
-                    # Для надежности лучше ответить 200, но записать в лог.
-                    logger.warning(f"Payment {payment_id} not found in DB")
+                    # Платеж не найден в базе (редкий кейс)
+                    logger.warning(f"Payment {payment_id} not found locally")
                     return web.Response(text="payment not found locally")
 
-                # ---------- ПРОВЕРКА ДУБЛЕЙ (Идемпотентность) ----------
-                if payment.status == "succeeded":
-                    return web.Response(text="already processed")
+                # === СЦЕНАРИЙ 1: ПРИШЕЛ ВЕБХУК О ЧЕКЕ (receipt.registration) ===
+                # Если он придет — отлично, отправим юзеру. Если нет — код сюда просто не зайдет.
+                if event == "receipt.registration":
+                    receipt_url = obj.get("registration_url")
 
-                # ---------- CANCELED ----------
-                if event == "payment.canceled":
+                    if receipt_url and payment.receipt_url != receipt_url:
+                        await update_receipt_url(session, payment_id, receipt_url)
+
+                        # Отправляем сообщение, только если URL реально есть
+                        try:
+                            await bot.send_message(
+                                chat_id=payment.telegram_id,
+                                text=f"🧾 <b>Ваш чек готов:</b>\n<a href='{receipt_url}'>Открыть чек</a>",
+                                disable_web_page_preview=True
+                            )
+                        except Exception as e:
+                            logger.error(f"Не удалось отправить чек пользователю {payment.telegram_id}: {e}")
+
+                    return web.Response(text="receipt updated")
+
+                # === СЦЕНАРИЙ 2: ПРИШЕЛ ВЕБХУК ОБ ОПЛАТЕ (payment.succeeded) ===
+                if event == "payment.succeeded":
+
+                    # Если уже обработан — выходим
+                    if payment.status == "succeeded":
+                        return web.Response(text="already processed")
+
+                    # 1. Верификация через API (чтобы удостовериться в сумме и статусе)
+                    api_payment = await fetch_payment(payment_id)
+
+                    if api_payment["status"] != "succeeded":
+                        await mark_payment_failed(session, payment_id)
+                        return web.Response(text="failed")
+
+                    amount = Decimal(api_payment["amount"]["value"])
+
+                    # 2. Пытаемся достать чек СРАЗУ (если Юкасса успела его создать)
+                    # Если чека нет — receipt_url будет None, и код не упадет.
+                    receipt_url = (api_payment.get("receipt", {}) or {}).get("registration_url")
+
+                    # 3. Начисление баланса
+                    if amount == Decimal("1.00"):
+                        await increment_requests(session, payment.telegram_id, 1)
+                    elif amount == Decimal("190.00"):
+                        await increment_requests(session, payment.telegram_id, 10)
+                    elif amount == Decimal("950.00"):
+                        await increment_requests(session, payment.telegram_id, 50)
+                    elif amount == Decimal("2.00"):  # Тестовый полный доступ
+                        await increment_requests(session, payment.telegram_id, 49)
+
+                    # 4. Сохраняем успех и URL чека (если он есть) в базу
+                    await mark_payment_succeeded(session, payment_id, receipt_url)
+
+                # === СЦЕНАРИЙ 3: ОТМЕНА ===
+                elif event == "payment.canceled":
                     if payment.status != "canceled":
                         await mark_payment_canceled(session, payment_id)
-                        # Сообщение можно отправить после транзакции или через create_task,
-                        # но здесь это не критично
                         try:
                             await bot.send_message(payment.telegram_id, "❌ Платёж был отменён.")
                         except:
                             pass
                     return web.Response(text="canceled")
 
-                # ---------- RECEIPT (Чек) ----------
-                if event == "receipt.registration":
-                    receipt_url = obj.get("registration_url")
-                    if receipt_url and not payment.receipt_url:
-                        await update_receipt_url(session, payment_id, receipt_url)
-                    return web.Response(text="receipt updated")
+                else:
+                    return web.Response(text="ignored event")
 
-                # ---------- SUCCEEDED ----------
-                if event != "payment.succeeded":
-                    return web.Response(text="ignored")
+        # ---------------------------------------------------------------
+        # УВЕДОМЛЕНИЕ ПОЛЬЗОВАТЕЛЯ (Только для payment.succeeded)
+        # ---------------------------------------------------------------
+        if event == "payment.succeeded":
+            if amount == Decimal("2.00") or amount == Decimal("1900.00"):
+                text = "🚀 <b>Полный доступ активирован!</b>"
+            else:
+                text = "✅ <b>Оплата прошла успешно!</b>\nЗапросы начислены."
 
-                # 🔐 ВЕРИФИКАЦИЯ ЧЕРЕЗ API ЮКАССЫ
-                api_payment = await fetch_payment(payment_id)
+            # ЛОГИКА "ЕСТЬ ЧЕК ИЛИ НЕТ":
+            if receipt_url:
+                # Если Юкасса сразу отдала ссылку — показываем
+                text += f"\n\n🧾 <a href='{receipt_url}'>Электронный чек</a>"
+            else:
+                # Если ссылки нет — просто не пишем ничего про чек.
+                # Пользователю не нужно знать про технические задержки.
+                pass
 
-                if api_payment["status"] != "succeeded":
-                    await mark_payment_failed(session, payment_id)
-                    await bot.send_message(payment.telegram_id, "❌ Оплата не прошла (статус API).")
-                    return web.Response(text="failed")
-
-                amount = Decimal(api_payment["amount"]["value"])
-                if amount != payment.amount:
-                    await mark_payment_failed(session, payment_id)
-                    logger.error(f"Amount mismatch: DB {payment.amount} != API {amount}")
-                    return web.Response(text="amount mismatch")
-
-                # Пытаемся достать чек из ответа API (если он там есть сразу)
-                receipt_url = (api_payment.get("receipt", {}) or {}).get("registration_url")
-
-                # ---------- НАЧИСЛЕНИЕ (БИЗНЕС-ЛОГИКА) ----------
-                if amount == Decimal("29.00"):  # Исправил на твои суммы из pay_config.py
-                    await increment_requests(session, payment.telegram_id, 1)
-                elif amount == Decimal("190.00"):
-                    await increment_requests(session, payment.telegram_id, 10)
-                elif amount == Decimal("950.00"):
-                    await increment_requests(session, payment.telegram_id, 50)
-                elif amount == Decimal("1900.00"):  # Полный доступ
-                    await increment_requests(session, payment.telegram_id, 50)
-                    # Добавь сюда логику активации полного доступа, если нужно
-
-                # Обновляем статус платежа
-                await mark_payment_succeeded(session, payment_id, receipt_url)
-
-            # 🔥 Блок session.begin() закончился -> произошел COMMIT.
-            # Если мы здесь, значит в базе всё сохранилось успешно.
-
-        # ---------- УВЕДОМЛЕНИЕ ПОЛЬЗОВАТЕЛЯ ----------
-        # Отправляем сообщение только если транзакция прошла
-        text = "✅ <b>Оплата прошла успешно!</b>\nЗапросы начислены."
-        if receipt_url:
-            text += f"\n\n🧾 <a href='{receipt_url}'>Электронный чек</a>"
-
-        try:
-            await bot.send_message(payment.telegram_id, text)
-        except Exception as e:
-            logger.error(f"Failed to send success message: {e}")
+            try:
+                await bot.send_message(payment.telegram_id, text, disable_web_page_preview=True)
+            except Exception as e:
+                logger.error(f"Failed to send success message: {e}")
 
         return web.Response(text="ok")
 
-    except Exception:
-        logger.exception("YooKassa webhook failed")
+    except Exception as e:
+        logger.exception(f"YooKassa webhook failed: {e}")
         return web.Response(status=500, text="internal error")
