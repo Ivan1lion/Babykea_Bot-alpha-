@@ -7,6 +7,7 @@ import aiohttp
 import base64
 import contextlib
 import logging
+import json
 
 
 from aiogram import F, Router, types, Bot
@@ -15,6 +16,7 @@ from aiogram.types import Message, FSInputFile, CallbackQuery, InputMediaPhoto, 
 from aiogram.enums import ParseMode
 from aiogram.fsm.state import StatesGroup, State
 from aiogram.fsm.context import FSMContext
+from aiogram.exceptions import TelegramBadRequest
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from decimal import Decimal
@@ -23,7 +25,7 @@ from decimal import Decimal
 import app.handlers.keyboards as kb
 from app.handlers.keyboards import payment_button_keyboard
 from app.db.crud import get_or_create_user, stop_if_no_promo, create_pending_payment
-from app.db.models import User, MagazineChannel, ChannelState, Magazine, Payment
+from app.db.models import User, MagazineChannel, ChannelState, Magazine, Payment, UserQuizProfile
 from app.db.config import session_maker
 from app.posting.resolver import resolve_channel_context
 from app.posting.state import is_new_post
@@ -141,7 +143,7 @@ async def process_promo_code(
         )
 
 
-######################### Обработка запросов пользователя к AI Responses API #########################
+######################### Обработка запросов пользователя к AI #########################
 
 
 #Функция, чтобы крутился индикатор "печатает"
@@ -150,47 +152,164 @@ async def send_typing(bot, chat_id, stop_event):
         await bot.send_chat_action(chat_id=chat_id, action="typing")
         await asyncio.sleep(4.5)
 
+
 @for_user_router.message(F.text)
 async def handle_text(message: Message, session: AsyncSession, bot: Bot):
+    # 1. Проверка промокода (твоя логика)
     if await stop_if_no_promo(message=message, session=session):
         return
 
+    # 2. Получаем пользователя
+    # Важно: нам нужно подгрузить связанные данные (магазин), если они не в одной таблице
+    # Либо сделаем отдельными легкими запросами ниже.
     result = await session.execute(select(User).where(User.telegram_id == message.from_user.id))
     user = result.scalar_one_or_none()
 
-    if user.requests_left == 0:
-        await message.answer(f"🚫 У вас закончились запросы\n\n"
-                             f"Чтобы продолжить поиск, подбор и сравнение колясок - пополните запросы"
-                             f"\n\n<a href='https://telegra.ph/AI-konsultant-rabotaet-na-platnoj-platforme-httpsplatformopenaicom-01-16'>"
-                             "(Почему запросы платные?)</a>", reply_markup=kb.pay)
+    if not user:
+        return  # Или ошибка "пользователь не найден"
+
+    # 3. Проверка баланса
+    if user.requests_left <= 0:
+        await message.answer(
+            f"🚫 У вас закончились запросы\n\n"
+            f"Чтобы продолжить поиск, подбор и сравнение колясок - пополните запросы"
+            f"\n\n<a href='https://telegra.ph/AI-konsultant-rabotaet-na-platnoj-platforme-httpsplatformopenaicom-01-16'>"
+            "(Почему запросы платные?)</a>",
+            reply_markup=kb.pay,
+            disable_web_page_preview=True
+        )
         return
 
-    # Стартуем фоновый "набор текста"
+    # --- СБОР ДАННЫХ ДЛЯ КОНТЕКСТА ---
+
+    # А. Получаем URL магазина
+    # Предполагаем, что у User есть поле magazine_id или promo_id, связывающее его с магазином
+    shop_url = "https://market.yandex.ru"  # Дефолтный, если не найдем
+
+    if user.magazine_id:  # Если связь через ID
+        mag_result = await session.execute(select(Magazine.url_website).where(Magazine.id == user.magazine_id))
+        shop_url = mag_result.scalar() or shop_url
+
+    # Б. Получаем данные квиза (предпочтения пользователя)
+    # JSONB обычно возвращается как dict в Python
+    quiz_data_str = "Данные о предпочтениях отсутствуют."
+
+    quiz_result = await session.execute(
+        select(UserQuizProfile.data)  # Предполагаем поле 'data' с JSONB
+        .where(UserQuizProfile.user_id == user.id)  # Или user.telegram_id, зависит от связи
+        .order_by(UserQuizProfile.id.desc())  # Берем самый свежий квиз
+        .limit(1)
+    )
+    quiz_data = quiz_result.scalar_one_or_none()
+
+    if quiz_data:
+        # Превращаем dict в красивую строку для промпта
+        quiz_data_str = json.dumps(quiz_data, ensure_ascii=False, indent=2)
+
+    # --- ФОРМИРОВАНИЕ СИСТЕМНОГО ПРОМПТА ---
+
+    system_prompt = (
+        "Ты профессиональный эксперт по подбору детских колясок. "
+        "Твоя цель — помочь клиенту выбрать идеальную коляску, исходя из его потребностей.\n\n"
+
+        f"📋 **ПРОФИЛЬ КЛИЕНТА (из анкеты):**\n{quiz_data_str}\n\n"
+
+        f"🛒 **ИСТОЧНИК ТОВАРОВ:**\n"
+        f"Ищи информацию и подбирай варианты ТОЛЬКО на сайте: {shop_url}\n"
+        "Если пользователь спрашивает о конкретной модели, проверь её наличие и характеристики на этом сайте с помощью Google Search.\n\n"
+
+        "**ИНСТРУКЦИИ:**\n"
+        "1. Отвечай кратко, по делу, структурировано.\n"
+        "2. Обязательно присылай ссылки на конкретные карточки товаров с указанного сайта.\n"
+        "3. Используй форматирование Markdown (жирный шрифт, списки) для удобства чтения.\n"
+        "4. Общайся вежливо и заботливо."
+    )
+
+    # --- ЗАПУСК ОБРАБОТКИ ---
+
     stop_event = asyncio.Event()
     typing_task = asyncio.create_task(send_typing(bot, message.chat.id, stop_event))
-
     typing_msg = await message.answer("Ваш запрос обрабатывается и готовится ответ 💬")
 
     try:
-        # 🔥 Вызов Responses API (запрос → ответ, без контекста)
-        answer = await ask_responses_api(message.text)
-        # Ответ пользователю от AI
-        await message.answer(answer, parse_mode=ParseMode.MARKDOWN)
+        # 🔥 Вызов API с динамическим промптом
+        answer = await ask_responses_api(
+            user_message=message.text,
+            system_instruction=system_prompt
+        )
 
-        # ✅ Запрос выполнен
+        # --- БЕЗОПАСНАЯ ОТПРАВКА СООБЩЕНИЯ (Anti-Crash) ---
+        try:
+            # Попытка 1: Отправляем красиво с Markdown
+            await message.answer(answer, parse_mode=ParseMode.MARKDOWN, disable_web_page_preview=True)
+        except TelegramBadRequest as e:
+            # Если Telegram не смог переварить разметку Gemini
+            logger.warning(f"Markdown parsing failed, sending plain text. Error: {e}")
+            # Попытка 2: Отправляем чистым текстом (гарантированная доставка)
+            await message.answer(answer, parse_mode=None, disable_web_page_preview=True)
+
+
+        # ✅ Списание баланса (только при успехе)
         user.requests_left -= 1
         await session.commit()
 
     except Exception as e:
-        await message.answer(f'⚠️ Ошибка при обработке запроса из-за проблем с интернет-соединением: {str(e)}\n\n'
-                             f'Повторите пожалуйста запрос позже')
+        logger.error(f"Ошибка в хэндлере: {e}", exc_info=True)
+        await message.answer(
+            '⚠️ Произошла ошибка при обработке запроса. '
+            'Пожалуйста, повторите попытку позже.'
+        )
     finally:
         # Убираем индикаторы
         stop_event.set()
         typing_task.cancel()
         with contextlib.suppress(asyncio.CancelledError):
             await typing_task
-        await typing_msg.delete()
+        try:
+            await typing_msg.delete()
+        except:
+            pass
+# @for_user_router.message(F.text)
+# async def handle_text(message: Message, session: AsyncSession, bot: Bot):
+#     if await stop_if_no_promo(message=message, session=session):
+#         return
+#
+#     result = await session.execute(select(User).where(User.telegram_id == message.from_user.id))
+#     user = result.scalar_one_or_none()
+#
+#     if user.requests_left == 0:
+#         await message.answer(f"🚫 У вас закончились запросы\n\n"
+#                              f"Чтобы продолжить поиск, подбор и сравнение колясок - пополните запросы"
+#                              f"\n\n<a href='https://telegra.ph/AI-konsultant-rabotaet-na-platnoj-platforme-httpsplatformopenaicom-01-16'>"
+#                              "(Почему запросы платные?)</a>", reply_markup=kb.pay)
+#         return
+#
+#     # Стартуем фоновый "набор текста"
+#     stop_event = asyncio.Event()
+#     typing_task = asyncio.create_task(send_typing(bot, message.chat.id, stop_event))
+#
+#     typing_msg = await message.answer("Ваш запрос обрабатывается и готовится ответ 💬")
+#
+#     try:
+#         # 🔥 Вызов Responses API (запрос → ответ, без контекста)
+#         answer = await ask_responses_api(message.text)
+#         # Ответ пользователю от AI
+#         await message.answer(answer, parse_mode=ParseMode.MARKDOWN)
+#
+#         # ✅ Запрос выполнен
+#         user.requests_left -= 1
+#         await session.commit()
+#
+#     except Exception as e:
+#         await message.answer(f'⚠️ Ошибка при обработке запроса из-за проблем с интернет-соединением: {str(e)}\n\n'
+#                              f'Повторите пожалуйста запрос позже')
+#     finally:
+#         # Убираем индикаторы
+#         stop_event.set()
+#         typing_task.cancel()
+#         with contextlib.suppress(asyncio.CancelledError):
+#             await typing_task
+#         await typing_msg.delete()
 
 
 
