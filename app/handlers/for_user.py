@@ -31,6 +31,7 @@ from app.posting.resolver import resolve_channel_context
 from app.posting.state import is_new_post
 from app.posting.dispatcher import dispatch_post
 from app.openai_assistant.responses_client import ask_responses_api
+from app.openai_assistant.prompts_config import get_system_prompt, get_marketing_footer
 from app.payments.pay_config import PAYMENTS
 
 
@@ -160,8 +161,6 @@ async def handle_text(message: Message, session: AsyncSession, bot: Bot):
         return
 
     # 2. Получаем пользователя
-    # Важно: нам нужно подгрузить связанные данные (магазин), если они не в одной таблице
-    # Либо сделаем отдельными легкими запросами ниже.
     result = await session.execute(select(User).where(User.telegram_id == message.from_user.id))
     user = result.scalar_one_or_none()
 
@@ -175,16 +174,14 @@ async def handle_text(message: Message, session: AsyncSession, bot: Bot):
             f"Чтобы продолжить поиск, подбор и сравнение колясок - пополните запросы"
             f"\n\n<a href='https://telegra.ph/AI-konsultant-rabotaet-na-platnoj-platforme-httpsplatformopenaicom-01-16'>"
             "(Почему запросы платные?)</a>",
-            reply_markup=kb.pay,
-            disable_web_page_preview=True
+            reply_markup=kb.pay
         )
         return
 
     # --- СБОР ДАННЫХ ДЛЯ КОНТЕКСТА ---
 
     # А. Получаем URL магазина
-    # Предполагаем, что у User есть поле magazine_id или promo_id, связывающее его с магазином
-    shop_url = "https://market.yandex.ru"  # Дефолтный, если не найдем
+    shop_url = None  # Дефолтный (Глобальный поиск), если не найдем
 
     if user.magazine_id:  # Если связь через ID
         mag_result = await session.execute(select(Magazine.url_website).where(Magazine.id == user.magazine_id))
@@ -193,61 +190,63 @@ async def handle_text(message: Message, session: AsyncSession, bot: Bot):
     # Б. Получаем данные квиза (предпочтения пользователя)
     # JSONB обычно возвращается как dict в Python
     quiz_data_str = "Данные о предпочтениях отсутствуют."
+    user_branch = "pregnant"  # Значение по умолчанию (если ветка не найдена)
 
     quiz_result = await session.execute(
-        select(UserQuizProfile.data)  # Предполагаем поле 'data' с JSONB
-        .where(UserQuizProfile.user_id == user.id)  # Или user.telegram_id, зависит от связи
-        .order_by(UserQuizProfile.id.desc())  # Берем самый свежий квиз
+        select(UserQuizProfile)
+        .where(UserQuizProfile.user_id == user.id)
+        .order_by(UserQuizProfile.id.desc())
         .limit(1)
     )
-    quiz_data = quiz_result.scalar_one_or_none()
+    quiz_profile = quiz_result.scalar_one_or_none()
 
-    if quiz_data:
-        # Превращаем dict в красивую строку для промпта
-        quiz_data_str = json.dumps(quiz_data, ensure_ascii=False, indent=2)
+    if quiz_profile:
+        # 1. Определяем ветку пользователя
+        if quiz_profile.branch:
+            user_branch = quiz_profile.branch
 
-    # --- ФОРМИРОВАНИЕ СИСТЕМНОГО ПРОМПТА ---
+        # 2. Форматируем JSON
+        try:
+            raw_data = quiz_profile.data
+            if isinstance(raw_data, str):
+                quiz_data_str = raw_data
+            else:
+                quiz_data_str = json.dumps(raw_data, ensure_ascii=False, indent=2)
+        except Exception:
+            quiz_data_str = str(quiz_profile.data)
 
-    system_prompt = (
-        "Ты профессиональный эксперт по подбору детских колясок. "
-        "Твоя цель — помочь клиенту выбрать идеальную коляску, исходя из его потребностей.\n\n"
-
-        f"📋 **ПРОФИЛЬ КЛИЕНТА (из анкеты):**\n{quiz_data_str}\n\n"
-
-        f"🛒 **ИСТОЧНИК ТОВАРОВ:**\n"
-        f"Ищи информацию и подбирай варианты ТОЛЬКО на сайте: {shop_url}\n"
-        "Если пользователь спрашивает о конкретной модели, проверь её наличие и характеристики на этом сайте с помощью Google Search.\n\n"
-
-        "**ИНСТРУКЦИИ:**\n"
-        "1. Отвечай кратко, по делу, структурировано.\n"
-        "2. Обязательно присылай ссылки на конкретные карточки товаров с указанного сайта.\n"
-        "3. Используй форматирование Markdown (жирный шрифт, списки) для удобства чтения.\n"
-        "4. Общайся вежливо и заботливо."
-    )
+        # --- ПОЛУЧАЕМ СИСТЕМНЫЙ ПРОМПТ ---
+        system_prompt = get_system_prompt(
+            branch=user_branch,
+            quiz_data=quiz_data_str,
+            shop_url=shop_url
+        )
 
     # --- ЗАПУСК ОБРАБОТКИ ---
-
     stop_event = asyncio.Event()
     typing_task = asyncio.create_task(send_typing(bot, message.chat.id, stop_event))
     typing_msg = await message.answer("Ваш запрос обрабатывается и готовится ответ 💬")
 
     try:
-        # 🔥 Вызов API с динамическим промптом
+        # 🔥 Генерация ответа AI
         answer = await ask_responses_api(
             user_message=message.text,
             system_instruction=system_prompt
         )
-
-        # --- БЕЗОПАСНАЯ ОТПРАВКА СООБЩЕНИЯ (Anti-Crash) ---
+        # --- ЛОГИКА ПЕРВОГО ЗАПРОСА (МАРКЕТИНГ) ---
+        if user.is_first_request:
+            # 👇 Выбираем правильный футер в зависимости от ветки (user_branch)
+            marketing_footer = get_marketing_footer(user_branch)
+            # Приклеиваем его к ответу
+            answer += marketing_footer
+            # Снимаем флаг
+            user.is_first_request = False
+        # --- ОТПРАВКА ---
         try:
-            # Попытка 1: Отправляем красиво с Markdown
             await message.answer(answer, parse_mode=ParseMode.MARKDOWN, disable_web_page_preview=True)
         except TelegramBadRequest as e:
-            # Если Telegram не смог переварить разметку Gemini
-            logger.warning(f"Markdown parsing failed, sending plain text. Error: {e}")
-            # Попытка 2: Отправляем чистым текстом (гарантированная доставка)
+            logger.warning(f"Markdown error: {e}")
             await message.answer(answer, parse_mode=None, disable_web_page_preview=True)
-
 
         # ✅ Списание баланса (только при успехе)
         user.requests_left -= 1

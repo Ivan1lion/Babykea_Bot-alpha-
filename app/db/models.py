@@ -58,9 +58,10 @@ class User(Base):
         ForeignKey("magazines.id"),
         nullable=True
     )
-    user_type: Mapped[str] = mapped_column(String(150), nullable=True)
+    stroller_model: Mapped[str] = mapped_column(String(50), nullable=True)
     stroller_condition: Mapped[str] = mapped_column(String(50), nullable=True)
     requests_left: Mapped[int] = mapped_column(Integer, default=1)
+    is_first_request = Column(Boolean, default=True)
     is_active: Mapped[bool] = mapped_column(default=True)
 
 

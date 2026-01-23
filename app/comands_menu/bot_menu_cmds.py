@@ -126,6 +126,9 @@ async def policy_cmd(message: Message, session: AsyncSession):
     await message.answer(f"1. /quiz_restart - пройти квиз-опрос заново"
                          f"<blockquote>На основании ваших ответов AI-консультант подбирает и сравнивает коляски, "
                          f"соответствующие запросу</blockquote>"
+                         f"\n\n/email - указать email для получения чеков"
+                         f"<blockquote>При необходимости вы можете указать свой email для получения чеков  об оплате "
+                         f"на свою почту</blockquote>"
                          f"\n\n2. Изменить время ТО"
                          f"\n\n3. Сохраненная информация")
 
