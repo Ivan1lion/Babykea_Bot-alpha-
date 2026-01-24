@@ -1,5 +1,8 @@
 import os
 import logging
+import aiohttp
+import re
+import asyncio
 from google import genai
 from google.genai import types
 from openai import AsyncOpenAI
@@ -18,37 +21,93 @@ openai_client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 google_client = genai.Client(api_key=os.getenv("GOOGLE_API_KEY"))
 
 
+# ==========================================
+# 🛠 ФУНКЦИИ ВАЛИДАЦИИ ССЫЛОК (POST-VALIDATION)
+# ==========================================
+
+async def check_url_status(session: aiohttp.ClientSession, url: str) -> bool:
+    """
+    Проверяет доступность ссылки (возвращает True, если статус 200).
+    """
+    try:
+        # Используем метод HEAD (запрашиваем только заголовки, без скачивания всей страницы) - это быстро
+        # Но некоторые сайты блокируют HEAD, поэтому надежнее использовать GET с ограничением
+        async with session.get(url, timeout=3, allow_redirects=True) as response:
+            if response.status == 200:
+                return True
+            logger.warning(f"❌ Битая ссылка (Status {response.status}): {url}")
+            return False
+    except Exception as e:
+        logger.warning(f"❌ Ошибка проверки ссылки {url}: {e}")
+        return False
+
+
+async def validate_and_fix_links(text: str) -> str:
+    """
+    Находит все Markdown-ссылки в тексте, проверяет их.
+    Если ссылка битая -> убирает URL, оставляя только название.
+    """
+    # Регулярка для поиска ссылок вида [Текст](https://...)
+    # Группа 1: Текст, Группа 2: URL
+    link_pattern = re.compile(r'\[([^\]]+)\]\((https?://[^\)]+)\)')
+
+    matches = link_pattern.findall(text)
+    if not matches:
+        return text  # Ссылок нет, возвращаем как есть
+
+    # Собираем уникальные ссылки для проверки
+    unique_urls = list(set(url for _, url in matches))
+
+    # Асинхронно проверяем все ссылки разом
+    async with aiohttp.ClientSession() as session:
+        tasks = [check_url_status(session, url) for url in unique_urls]
+        results = await asyncio.gather(*tasks)
+
+    # Создаем карту: URL -> Доступен (True/False)
+    url_status = dict(zip(unique_urls, results))
+
+    # Функция замены для re.sub
+    def replace_match(match):
+        title = match.group(1)
+        url = match.group(2)
+
+        if url_status.get(url, False):
+            # Ссылка живая - оставляем как есть
+            return f"[{title}]({url})"
+        else:
+            # Ссылка мертвая - оставляем только текст + пометку (или просто текст)
+            # Вариант 1: "Anex Air-Z (ссылка не найдена)"
+            # Вариант 2 (твой выбор): Просто "Anex Air-Z" (ссылка удаляется)
+            return f"{title} (нет в наличии по ссылке)"
+
+            # Заменяем все вхождения в тексте
+
+    fixed_text = link_pattern.sub(replace_match, text)
+    return fixed_text
+
+
+# ==========================================
+# 🧠 ОСНОВНАЯ ФУНКЦИЯ ЗАПРОСА
+# ==========================================
+
 async def ask_responses_api(user_message: str, system_instruction: str) -> str:
     """
     Отправляет запрос к AI.
-    Приоритет: Google Gemini 3 Pro (с поиском) -> Fallback: OpenAI (ChatGPT).
-
-    Args:
-        user_message (str): Вопрос пользователя.
-        system_instruction (str): Полный системный промпт (с данными квиза и URL).
+    Приоритет: Google Gemini 3 Pro -> Fallback: OpenAI.
+    В конце выполняется проверка ссылок на валидность.
     """
+    raw_answer = ""
 
-    # ---------------------------------------------------------
-    # ПОПЫТКА 1: Google Gemini 3 Pro (Основной)
-    # ---------------------------------------------------------
+    # --- 1. Google Gemini ---
     try:
-        # Настраиваем инструмент поиска (Grounding)
-        # В Gemini 3 модель сама решает, когда гуглить (Dynamic Retrieval)
-        tools_config = [
-            types.Tool(google_search=types.GoogleSearch())
-        ]
+        tools_config = [types.Tool(google_search=types.GoogleSearch())]
 
-        # Конфигурация генерации
         generate_config = types.GenerateContentConfig(
-            temperature=1.0,  # Рекомендовано Google для Gemini 3
+            temperature=1.0,
             system_instruction=system_instruction,
             tools=tools_config
         )
 
-        # logger.info("🚀 Запрос к Gemini 3 Pro (Async)...")
-
-        # ИСПОЛЬЗУЕМ native async (через .aio)
-        # Модель: gemini-3-pro-preview (так как у тебя теперь платный аккаунт)
         response = await google_client.aio.models.generate_content(
             model="gemini-3-flash-preview",
             contents=user_message,
@@ -56,82 +115,119 @@ async def ask_responses_api(user_message: str, system_instruction: str) -> str:
         )
 
         if response.text:
-            return response.text
+            raw_answer = response.text
         else:
-            raise ValueError("Gemini вернул пустой текстовый ответ")
+            raise ValueError("Gemini вернул пустой ответ")
 
     except Exception as e:
-        # Логируем ошибку, но не роняем бота
-        logger.error(f"⚠️ Ошибка Gemini API: {e}. Переключаюсь на резерв (ChatGPT)...", exc_info=True)
+        logger.error(f"⚠️ Ошибка Gemini: {e}. Переключаюсь на резерв...", exc_info=True)
 
-    # ---------------------------------------------------------
-    # ПОПЫТКА 2: OpenAI ChatGPT (Резерв)
-    # ---------------------------------------------------------
-    try:
-        messages = [
-            {"role": "system", "content": system_instruction},
-            {"role": "user", "content": user_message}
-        ]
+        # --- 2. OpenAI (Fallback) ---
+        try:
+            messages = [
+                {"role": "system", "content": system_instruction},
+                {"role": "user", "content": user_message}
+            ]
 
-        # Используем твою модель (замени gpt-5.2 на gpt-4o, если 5.2 еще нет в API)
-        response = await openai_client.chat.completions.create(
-            model="gpt-5.2",
-            messages=messages,
-            temperature=0.7,
-            top_p=0.9,
-        )
+            response = await openai_client.chat.completions.create(
+                model="gpt-5.2",  # Или gpt-4o
+                messages=messages,
+                temperature=0.7
+            )
+            raw_answer = response.choices[0].message.content or ""
 
-        answer = response.choices[0].message.content
-        if not answer:
-            raise ValueError("ChatGPT вернул пустой ответ")
+        except Exception as ex:
+            logger.critical(f"❌ CRITICAL: Все API упали: {ex}", exc_info=True)
+            return "Извините, технический сбой. Повторите попытку позже."
 
-        return answer
+    # --- 3. ПОСТ-ВАЛИДАЦИЯ ССЫЛОК (LEVEL 3) ---
+    if raw_answer:
+        # logger.info("🔍 Проверка ссылок на валидность...")
+        final_answer = await validate_and_fix_links(raw_answer)
+        return final_answer
 
-    except Exception as e:
-        logger.critical(f"❌ CRITICAL: Оба API недоступны: {e}", exc_info=True)
-        return (
-            "Извините, сейчас наблюдаются технические проблемы с подключением к нейросетям. "
-            "Пожалуйста, повторите ваш запрос через пару минут."
-        )
+    return "Не удалось получить ответ."
 
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-# from openai import AsyncOpenAI
-# import os
-#
-# openai_client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-#
-# SYSTEM_PROMPT = (
-#     "Ты эксперт по подбору детских колясок. "
-#     "Отвечай подробно и по делу, только по запросу пользователя."
-# )
-#
-# async def ask_responses_api(user_message: str) -> str:
+# ==========================================
+# 🧠 ОСНОВНАЯ ФУНКЦИЯ ЗАПРОСА
+# ==========================================
+# async def ask_responses_api(user_message: str, system_instruction: str) -> str:
 #     """
-#     Отправка запроса в Responses API без контекста
+#     Отправляет запрос к AI.
+#     Приоритет: Google Gemini (с поиском) -> Fallback: OpenAI (ChatGPT).
+#     В конце выполняется проверка ссылок на валидность.
+#     Args:
+#         user_message (str): Вопрос пользователя.
+#         system_instruction (str): Полный системный промпт (с данными квиза и URL).
 #     """
-#     messages = [
-#         {"role": "system", "content": SYSTEM_PROMPT},
-#         {"role": "user", "content": user_message}
-#     ]
-#     response = await openai_client.responses.create(
-#         model="gpt-5.2",
-#         temperature=0.7,
-#         top_p=0.9,
-#         input=messages,
-#     )
-#     return response.output_text
+#
+#     # ---------------------------------------------------------
+#     # ПОПЫТКА 1: Google Gemini 3 Pro (Основной)
+#     # ---------------------------------------------------------
+#     try:
+#         # Настраиваем инструмент поиска (Grounding)
+#         # В Gemini 3 модель сама решает, когда гуглить (Dynamic Retrieval)
+#         tools_config = [
+#             types.Tool(google_search=types.GoogleSearch())
+#         ]
+#
+#         # Конфигурация генерации
+#         generate_config = types.GenerateContentConfig(
+#             temperature=1.0,  # Рекомендовано Google для Gemini 3
+#             system_instruction=system_instruction,
+#             tools=tools_config
+#         )
+#
+#         # logger.info("🚀 Запрос к Gemini 3 Pro (Async)...")
+#
+#         # ИСПОЛЬЗУЕМ native async (через .aio)
+#         # Модель: gemini-3-pro-preview (так как у тебя теперь платный аккаунт)
+#         response = await google_client.aio.models.generate_content(
+#             model="gemini-3-flash-preview",
+#             contents=user_message,
+#             config=generate_config
+#         )
+#
+#         if response.text:
+#             return response.text
+#         else:
+#             raise ValueError("Gemini вернул пустой текстовый ответ")
+#
+#     except Exception as e:
+#         # Логируем ошибку, но не роняем бота
+#         logger.error(f"⚠️ Ошибка Gemini API: {e}. Переключаюсь на резерв (ChatGPT)...", exc_info=True)
+#
+#     # ---------------------------------------------------------
+#     # ПОПЫТКА 2: OpenAI ChatGPT (Резерв)
+#     # ---------------------------------------------------------
+#     try:
+#         messages = [
+#             {"role": "system", "content": system_instruction},
+#             {"role": "user", "content": user_message}
+#         ]
+#
+#         # Используем твою модель (замени gpt-5.2 на gpt-4o, если 5.2 еще нет в API)
+#         response = await openai_client.chat.completions.create(
+#             model="gpt-5.2",
+#             messages=messages,
+#             temperature=0.7,
+#             top_p=0.9,
+#         )
+#
+#         answer = response.choices[0].message.content
+#         if not answer:
+#             raise ValueError("ChatGPT вернул пустой ответ")
+#
+#         return answer
+#
+#     except Exception as e:
+#         logger.critical(f"❌ CRITICAL: Оба API недоступны: {e}", exc_info=True)
+#         return (
+#             "Извините, сейчас наблюдаются технические проблемы с подключением к нейросетям. "
+#             "Пожалуйста, повторите ваш запрос через пару минут."
+#         )
+
+
