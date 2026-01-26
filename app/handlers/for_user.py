@@ -33,11 +33,15 @@ from app.posting.dispatcher import dispatch_post
 from app.openai_assistant.responses_client import ask_responses_api
 from app.openai_assistant.prompts_config import get_system_prompt, get_marketing_footer
 from app.payments.pay_config import PAYMENTS
+from app.services.search_service import search_in_pinecone
+from app.services.classifier import classify_intent
 
 
 
-for_user_router = Router()
+
 logger = logging.getLogger(__name__)
+for_user_router = Router()
+
 # channel = int(os.getenv("CHANNEL_ID"))
 
 class ActivationState(StatesGroup):
@@ -163,103 +167,130 @@ async def handle_text(message: Message, session: AsyncSession, bot: Bot):
     # 2. Получаем пользователя
     result = await session.execute(select(User).where(User.telegram_id == message.from_user.id))
     user = result.scalar_one_or_none()
+    if not user: return
 
-    if not user:
-        return  # Или ошибка "пользователь не найден"
-
-    # 3. Проверка баланса
     if user.requests_left <= 0:
-        await message.answer(
-            f"🚫 У вас закончились запросы\n\n"
-            f"Чтобы продолжить поиск, подбор и сравнение колясок - пополните запросы"
-            f"\n\n<a href='https://telegra.ph/AI-konsultant-rabotaet-na-platnoj-platforme-httpsplatformopenaicom-01-16'>"
-            "(Почему запросы платные?)</a>",
-            reply_markup=kb.pay
-        )
+        await message.answer("🚫 Запросы закончились. Пополните баланс.", reply_markup=kb.pay)
         return
 
-    # --- СБОР ДАННЫХ ДЛЯ КОНТЕКСТА ---
-
-    # А. Получаем URL магазина
-    shop_url = None  # Дефолтный (Глобальный поиск), если не найдем
-
-    if user.magazine_id:  # Если связь через ID
-        mag_result = await session.execute(select(Magazine.url_website).where(Magazine.id == user.magazine_id))
-        shop_url = mag_result.scalar() or shop_url
-
-    # Б. Получаем данные квиза (предпочтения пользователя)
-    # JSONB обычно возвращается как dict в Python
-    quiz_data_str = "Данные о предпочтениях отсутствуют."
-    user_branch = "pregnant"  # Значение по умолчанию (если ветка не найдена)
-
-    quiz_result = await session.execute(
-        select(UserQuizProfile)
-        .where(UserQuizProfile.user_id == user.id)
-        .order_by(UserQuizProfile.id.desc())
-        .limit(1)
-    )
-    quiz_profile = quiz_result.scalar_one_or_none()
-
-    if quiz_profile:
-        # 1. Определяем ветку пользователя
-        if quiz_profile.branch:
-            user_branch = quiz_profile.branch
-
-        # 2. Форматируем JSON
-        try:
-            raw_data = quiz_profile.data
-            if isinstance(raw_data, str):
-                quiz_data_str = raw_data
-            else:
-                quiz_data_str = json.dumps(raw_data, ensure_ascii=False, indent=2)
-        except Exception:
-            quiz_data_str = str(quiz_profile.data)
-
-        # --- ПОЛУЧАЕМ СИСТЕМНЫЙ ПРОМПТ ---
-        system_prompt = get_system_prompt(
-            branch=user_branch,
-            quiz_data=quiz_data_str,
-            shop_url=shop_url
-        )
-
-    # --- ЗАПУСК ОБРАБОТКИ ---
+    # Запускаем "печатает..."
     stop_event = asyncio.Event()
     typing_task = asyncio.create_task(send_typing(bot, message.chat.id, stop_event))
-    typing_msg = await message.answer("Ваш запрос обрабатывается и готовится ответ 💬")
+    typing_msg = await message.answer("🤔 Анализирую запрос...")
 
     try:
-        # 🔥 Генерация ответа AI
+        # ==========================================
+        # 1. ОПРЕДЕЛЯЕМ НАМЕРЕНИЕ (INTENT)
+        # ==========================================
+        # CATALOG, INFO или SUPPORT
+        intent = await classify_intent(message.text)
+        logger.info(f"Intention detected: {intent}")
+
+        # ==========================================
+        # 2. ПОДГОТОВКА ДАННЫХ
+        # ==========================================
+
+        # Данные магазина
+        mag_result = await session.execute(select(Magazine).where(Magazine.id == user.magazine_id))
+        current_magazine = mag_result.scalar_one_or_none()
+
+        # Данные квиза
+        quiz_data_str = "Нет данных."
+        quiz_json_obj = {}
+
+        quiz_result = await session.execute(
+            select(UserQuizProfile).where(UserQuizProfile.user_id == user.id).order_by(UserQuizProfile.id.desc()).limit(
+                1)
+        )
+        quiz_profile = quiz_result.scalar_one_or_none()
+        if quiz_profile:
+            try:
+                if isinstance(quiz_profile.data, str):
+                    quiz_json_obj = json.loads(quiz_profile.data)
+                    quiz_data_str = quiz_profile.data
+                else:
+                    quiz_json_obj = quiz_profile.data
+                    quiz_data_str = json.dumps(quiz_profile.data, ensure_ascii=False)
+            except:
+                pass
+
+        # ==========================================
+        # 3. ЛОГИКА ВЕТВЛЕНИЯ (ГЛАВНАЯ ЧАСТЬ)
+        # ==========================================
+
+        products_context = ""
+        final_shop_url = None
+
+        # --- ВЕТКА CATALOG (ПОДБОР) ---
+        if intent == "CATALOG":
+
+            # Логика магазина (A/B/C)
+            if current_magazine:
+                feed_url = current_magazine.feed_url
+
+                # СЦЕНАРИЙ "ФЛАГ": Google Search (старая логика)
+                if feed_url == "Google_Search":
+                    final_shop_url = current_magazine.url_website
+                    # Pinecone НЕ используем
+
+                # СЦЕНАРИЙ "ЕСТЬ ФИД": Pinecone (конкретный магазин)
+                elif feed_url:
+                    products_context = await search_in_pinecone(
+                        user_query=message.text,
+                        quiz_json=quiz_json_obj,
+                        magazine_id=current_magazine.id,  # Фильтр по ID
+                        top_k=5
+                    )
+
+                # СЦЕНАРИЙ "ПУСТОЙ ФИД": Pinecone (глобальный поиск)
+                else:
+                    products_context = await search_in_pinecone(
+                        user_query=message.text,
+                        quiz_json=quiz_json_obj,
+                        magazine_id=None,  # Ищем везде
+                        top_k=5
+                    )
+            else:
+                # Если магазин вообще не привязан - ищем везде в Pinecone
+                products_context = await search_in_pinecone(message.text, quiz_json_obj, None)
+
+        # --- ВЕТКА INFO / SUPPORT ---
+        else:
+            # Для сравнения и ремонта нам не нужен Pinecone и привязка к магазину.
+            # Мы разрешим AI гуглить везде.
+            pass
+
+        # ==========================================
+        # 4. ГЕНЕРАЦИЯ ОТВЕТА
+        # ==========================================
+
+        system_prompt = get_system_prompt(
+            intent=intent,
+            quiz_data=quiz_data_str,
+            shop_url=final_shop_url,  # Будет заполнено только если "Google_Search"
+            products_context=products_context  # Будет заполнено если RAG
+        )
+
         answer = await ask_responses_api(
             user_message=message.text,
             system_instruction=system_prompt
         )
-        # --- ЛОГИКА ПЕРВОГО ЗАПРОСА (МАРКЕТИНГ) ---
-        if user.is_first_request:
-            # 👇 Выбираем правильный футер в зависимости от ветки (user_branch)
-            marketing_footer = get_marketing_footer(user_branch)
-            # Приклеиваем его к ответу
-            answer += marketing_footer
-            # Снимаем флаг
-            user.is_first_request = False
-        # --- ОТПРАВКА ---
+
+        # Добавляем футер
+        answer += get_marketing_footer(intent)
+
         try:
             await message.answer(answer, parse_mode=ParseMode.MARKDOWN, disable_web_page_preview=True)
-        except TelegramBadRequest as e:
-            logger.warning(f"Markdown error: {e}")
+        except TelegramBadRequest:
             await message.answer(answer, parse_mode=None, disable_web_page_preview=True)
 
-        # ✅ Списание баланса (только при успехе)
         user.requests_left -= 1
         await session.commit()
 
     except Exception as e:
-        logger.error(f"Ошибка в хэндлере: {e}", exc_info=True)
-        await message.answer(
-            '⚠️ Произошла ошибка при обработке запроса. '
-            'Пожалуйста, повторите попытку позже.'
-        )
+        logger.error(f"Error: {e}", exc_info=True)
+        await message.answer("⚠️ Произошла ошибка. Попробуйте позже.")
     finally:
-        # Убираем индикаторы
         stop_event.set()
         typing_task.cancel()
         with contextlib.suppress(asyncio.CancelledError):
@@ -268,47 +299,132 @@ async def handle_text(message: Message, session: AsyncSession, bot: Bot):
             await typing_msg.delete()
         except:
             pass
+
+
+
+
+
+
+
+
+
+
+                                   #Рабочий хэндлер до всей той штуки с векторными БД. Использовать его в случае фивско
 # @for_user_router.message(F.text)
 # async def handle_text(message: Message, session: AsyncSession, bot: Bot):
+#     # 1. Проверка промокода (твоя логика)
 #     if await stop_if_no_promo(message=message, session=session):
 #         return
 #
+#     # 2. Получаем пользователя
 #     result = await session.execute(select(User).where(User.telegram_id == message.from_user.id))
 #     user = result.scalar_one_or_none()
 #
-#     if user.requests_left == 0:
-#         await message.answer(f"🚫 У вас закончились запросы\n\n"
-#                              f"Чтобы продолжить поиск, подбор и сравнение колясок - пополните запросы"
-#                              f"\n\n<a href='https://telegra.ph/AI-konsultant-rabotaet-na-platnoj-platforme-httpsplatformopenaicom-01-16'>"
-#                              "(Почему запросы платные?)</a>", reply_markup=kb.pay)
+#     if not user:
+#         return  # Или ошибка "пользователь не найден"
+#
+#     # 3. Проверка баланса
+#     if user.requests_left <= 0:
+#         await message.answer(
+#             f"🚫 У вас закончились запросы\n\n"
+#             f"Чтобы продолжить поиск, подбор и сравнение колясок - пополните запросы"
+#             f"\n\n<a href='https://telegra.ph/AI-konsultant-rabotaet-na-platnoj-platforme-httpsplatformopenaicom-01-16'>"
+#             "(Почему запросы платные?)</a>",
+#             reply_markup=kb.pay
+#         )
 #         return
 #
-#     # Стартуем фоновый "набор текста"
+#     # --- СБОР ДАННЫХ ДЛЯ КОНТЕКСТА ---
+#
+#     # А. Получаем URL магазина
+#     shop_url = None  # Дефолтный (Глобальный поиск), если не найдем
+#
+#     if user.magazine_id:  # Если связь через ID
+#         mag_result = await session.execute(select(Magazine.url_website).where(Magazine.id == user.magazine_id))
+#         shop_url = mag_result.scalar() or shop_url
+#
+#     # Б. Получаем данные квиза (предпочтения пользователя)
+#     # JSONB обычно возвращается как dict в Python
+#     quiz_data_str = "Данные о предпочтениях отсутствуют."
+#     user_branch = "pregnant"  # Значение по умолчанию (если ветка не найдена)
+#
+#     quiz_result = await session.execute(
+#         select(UserQuizProfile)
+#         .where(UserQuizProfile.user_id == user.id)
+#         .order_by(UserQuizProfile.id.desc())
+#         .limit(1)
+#     )
+#     quiz_profile = quiz_result.scalar_one_or_none()
+#
+#     if quiz_profile:
+#         # 1. Определяем ветку пользователя
+#         if quiz_profile.branch:
+#             user_branch = quiz_profile.branch
+#
+#         # 2. Форматируем JSON
+#         try:
+#             raw_data = quiz_profile.data
+#             if isinstance(raw_data, str):
+#                 quiz_data_str = raw_data
+#             else:
+#                 quiz_data_str = json.dumps(raw_data, ensure_ascii=False, indent=2)
+#         except Exception:
+#             quiz_data_str = str(quiz_profile.data)
+#
+#         # --- ПОЛУЧАЕМ СИСТЕМНЫЙ ПРОМПТ ---
+#         system_prompt = get_system_prompt(
+#             branch=user_branch,
+#             quiz_data=quiz_data_str,
+#             shop_url=shop_url
+#         )
+#
+#     # --- ЗАПУСК ОБРАБОТКИ ---
 #     stop_event = asyncio.Event()
 #     typing_task = asyncio.create_task(send_typing(bot, message.chat.id, stop_event))
-#
 #     typing_msg = await message.answer("Ваш запрос обрабатывается и готовится ответ 💬")
 #
 #     try:
-#         # 🔥 Вызов Responses API (запрос → ответ, без контекста)
-#         answer = await ask_responses_api(message.text)
-#         # Ответ пользователю от AI
-#         await message.answer(answer, parse_mode=ParseMode.MARKDOWN)
+#         # 🔥 Генерация ответа AI
+#         answer = await ask_responses_api(
+#             user_message=message.text,
+#             system_instruction=system_prompt
+#         )
+#         # --- ЛОГИКА ПЕРВОГО ЗАПРОСА (МАРКЕТИНГ) ---
+#         if user.is_first_request:
+#             # 👇 Выбираем правильный футер в зависимости от ветки (user_branch)
+#             marketing_footer = get_marketing_footer(user_branch)
+#             # Приклеиваем его к ответу
+#             answer += marketing_footer
+#             # Снимаем флаг
+#             user.is_first_request = False
+#         # --- ОТПРАВКА ---
+#         try:
+#             await message.answer(answer, parse_mode=ParseMode.MARKDOWN, disable_web_page_preview=True)
+#         except TelegramBadRequest as e:
+#             logger.warning(f"Markdown error: {e}")
+#             await message.answer(answer, parse_mode=None, disable_web_page_preview=True)
 #
-#         # ✅ Запрос выполнен
+#         # ✅ Списание баланса (только при успехе)
 #         user.requests_left -= 1
 #         await session.commit()
 #
 #     except Exception as e:
-#         await message.answer(f'⚠️ Ошибка при обработке запроса из-за проблем с интернет-соединением: {str(e)}\n\n'
-#                              f'Повторите пожалуйста запрос позже')
+#         logger.error(f"Ошибка в хэндлере: {e}", exc_info=True)
+#         await message.answer(
+#             '⚠️ Произошла ошибка при обработке запроса. '
+#             'Пожалуйста, повторите попытку позже.'
+#         )
 #     finally:
 #         # Убираем индикаторы
 #         stop_event.set()
 #         typing_task.cancel()
 #         with contextlib.suppress(asyncio.CancelledError):
 #             await typing_task
-#         await typing_msg.delete()
+#         try:
+#             await typing_msg.delete()
+#         except:
+#             pass
+
 
 
 
@@ -430,222 +546,7 @@ async def process_payment(
 
 
 
-# @for_user_router.callback_query(F.data.startswith("pay"))
-# async def process_payment(
-#     callback: CallbackQuery,
-#     bot: Bot,
-#     session: AsyncSession,
-# ):
-#     telegram_id = callback.from_user.id
-#     cfg = PAYMENTS.get(callback.data)
-#
-#     if not cfg:
-#         await callback.answer("Неизвестный тариф", show_alert=True)
-#         return
-#
-#     amount = cfg["amount"]
-#     return_url = f"https://t.me/{(await bot.me()).username}"
-#
-#     # ---------- проверяем пользователя ----------
-#     result = await session.execute(
-#         select(User).where(User.telegram_id == telegram_id)
-#     )
-#     user = result.scalar_one_or_none()
-#     if not user:
-#         return
-#
-#     # ---------- payload для YooKassa ----------
-#     payment_payload = {
-#         "amount": {
-#             "value": f"{amount:.2f}",
-#             "currency": "RUB",
-#         },
-#         "confirmation": {
-#             "type": "redirect",
-#             "return_url": return_url,
-#         },
-#         "capture": True,
-#         "description": f"Оплата на сумму {amount} ₽",
-#         "metadata": {
-#             "telegram_id": str(telegram_id),
-#             "payment_type": callback.data,
-#         },
-#         "receipt": {
-#             "customer": {
-#                 "email": "tobedrive@yandex.ru",
-#             },
-#             "tax_system_code": 2,
-#             "items": [
-#                 {
-#                     "description": "Доступ к функционалу Telegram-бота",
-#                     "quantity": "1.00",
-#                     "measure": "service",
-#                     "amount": {
-#                         "value": f"{amount:.2f}",
-#                         "currency": "RUB",
-#                     },
-#                     "vat_code": 1,
-#                 }
-#             ],
-#         },
-#     }
-#
-#     # ---------- auth ----------
-#     def base64_auth():
-#         raw = f"{os.getenv('YOOKASSA_SHOP_ID')}:{os.getenv('YOOKASSA_SECRET_KEY')}"
-#         return base64.b64encode(raw.encode()).decode()
-#
-#     headers = {
-#         "Authorization": f"Basic {base64_auth()}",
-#         "Content-Type": "application/json",
-#         "Idempotence-Key": str(uuid4()),
-#     }
-#
-#     try:
-#         async with aiohttp.ClientSession() as http:
-#             async with http.post(
-#                 "https://api.yookassa.ru/v3/payments",
-#                 json=payment_payload,
-#                 headers=headers,
-#             ) as resp:
-#                 payment_response = await resp.json()
-#
-#         print("📦 Ответ от ЮKassa:", payment_response)
-#
-#         if "confirmation" not in payment_response:
-#             error_text = payment_response.get("description", "Нет confirmation")
-#             await callback.message.answer(f"❌ Ошибка ЮKassa: {error_text}")
-#             return
-#
-#         payment_id = payment_response["id"]
-#         confirmation_url = payment_response["confirmation"]["confirmation_url"]
-#
-#         # ===================== 🔴 сохраняем PENDING платёж в БД =====================
-#         await create_pending_payment(
-#             session=session,
-#             payment_id=payment_id,
-#             telegram_id=telegram_id,
-#             amount=amount,
-#         )
-#         # ===============================================================
-#
-#         await callback.message.answer(
-#             cfg["message"],
-#             reply_markup=payment_button_keyboard(confirmation_url),
-#         )
-#         await callback.answer()
-#
-#     except Exception:
-#         logger.exception("Ошибка при создании платежа")
-#         await callback.message.answer(
-#             "❌ Ошибка при создании платежа. Попробуйте позже."
-#         )
 
-
-
-
-
-# @for_user_router.callback_query(F.data.startswith("pay"))
-# async def process_payment(callback: CallbackQuery, bot: Bot, session: AsyncSession):
-#     telegram_id = callback.from_user.id
-#     amount_map = {
-#         "pay29": 1,
-#         "pay950": 950,
-#         "pay190": 190
-#     }
-#
-#     data_key = callback.data
-#     amount = amount_map.get(data_key)
-#     if not amount:
-#         await callback.answer("Неизвестная сумма", show_alert=True)
-#         return
-#
-#     return_url = f"https://t.me/{(await bot.me()).username}"
-#
-#
-#     # Получаем пользователя
-#     result = await session.execute(select(User).where(User.telegram_id == telegram_id))
-#     user = result.scalar_one_or_none()
-#     if not user:
-#         return
-#
-#     payment_payload = {
-#         "amount": {
-#             "value": f"{amount:.2f}",
-#             "currency": "RUB"
-#         },
-#         "confirmation": {
-#             "type": "redirect",
-#             "return_url": return_url
-#         },
-#         "capture": True,
-#         "description": f"Доступ к функционалу бота на сумму {amount} ₽",
-#         "metadata": {
-#             "telegram_id": str(telegram_id),
-#             "payment_type": "bot_access",
-#         },
-#         "receipt": {
-#             "customer": {
-#                 "email": "tobedrive@yandex.ru"  # 🔴 ТВОЙ сервисный email
-#             },
-#             "tax_system_code": 2,  # 🔴 НПД (самозанятый)
-#             "items": [
-#                 {
-#                     "description": "Доступ к функционалу Telegram-бота",
-#                     "quantity": "1.00",
-#                     "measure": "service",
-#                     "amount": {
-#                         "value": f"{amount:.2f}",
-#                         "currency": "RUB"
-#                     },
-#                     "vat_code": 1,  # без НДС
-#                 }
-#             ]
-#         }
-#     }
-#     def base64_auth():
-#         shop_id = os.getenv("YOOKASSA_SHOP_ID")
-#         secret = os.getenv("YOOKASSA_SECRET_KEY")
-#         raw = f"{shop_id}:{secret}".encode()
-#         return base64.b64encode(raw).decode()
-#
-#     headers = {
-#         "Authorization": f"Basic {base64_auth()}",
-#         "Content-Type": "application/json",
-#         "Idempotence-Key": str(uuid4())
-#     }
-#
-#     try:
-#         async with aiohttp.ClientSession() as session_http:
-#             async with session_http.post(
-#                 url="https://api.yookassa.ru/v3/payments",
-#                 json=payment_payload,
-#                 headers=headers
-#             ) as resp:
-#                 payment_response = await resp.json()
-#
-#         print("📦 Ответ от ЮKassa:", payment_response)
-#
-#         if "confirmation" not in payment_response:
-#             error_text = payment_response.get("description", "Нет поля confirmation")
-#             await callback.message.answer(f"❌ Ошибка ЮKassa: {error_text}")
-#             return
-#
-#         confirmation_url = payment_response["confirmation"]["confirmation_url"]
-#         await callback.message.answer(
-#             f'Вы приобретаете дополнительные запросы'
-#             f'\n\nПосле успешной оплаты, они отобразятся в разделе -> 🤖 AI-консультант'
-#             f'\n\n<blockquote>Оплата производится через Yoomoney (Юkassa) - cервис безопасных платежей ПАО "Сбербанк"</blockquote>',
-#             reply_markup=payment_button_keyboard(confirmation_url)
-#         )
-#         await callback.answer()
-#
-#     except Exception as e:
-#         print("❌ Ошибка при создании платежа:", e)
-#         await callback.message.answer("Ошибка при попытке создать платёж. Подробности в логах.")
-
-#
-#
 # # Отправка сообщений из канала Mari
 #
 # @for_user_router.channel_post()

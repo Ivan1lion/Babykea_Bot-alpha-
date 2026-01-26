@@ -76,7 +76,7 @@ QUIZ_CONFIG = {
                     },
                     "save": {"usage_format": "car_trips"}
                 },
-                "travel": {
+                "air_travel": {
                     "button": "Для путешествий",
                     "preview": {
                         "photo": "AgACAgIAAxkDAAIw_2lhHwM1PihBh5cjowVPdzANcQEJAAJUC2sbEv8QS9m1_R5LMJ5NAQADAgADeQADOAQ",
@@ -168,7 +168,7 @@ QUIZ_CONFIG = {
                         "text": "<blockquote>Детская коляска подходящая для передвижения по грунту. Большие колёса, "
                                 "крепкая рама - если живёте за городом</blockquote>"
                     },
-                    "save": {"road_conditions": ["ground", "soil"]}
+                    "save": {"road_conditions": "ground"}
                 },
                 "asphalt": {
                     "button": "Аcфальт",
@@ -186,7 +186,7 @@ QUIZ_CONFIG = {
                         "text": "<blockquote>Детская коляска подходящая для передвижения по грунту, асфальту "
                                 "или плитке. Обладает средним размером колёс и неплохой системой амортизации</blockquote>"
                     },
-                    "save": {"road_conditions": ["soil", "asphalt"]}
+                    "save": {"road_conditions": ["ground and asphalt"]}
                 },
                 "offroad": {
                     "button": "Off-road",
@@ -197,7 +197,7 @@ QUIZ_CONFIG = {
                                 "и тяжелы. Но если нужно уходить от погони по снегу – это идеальный вариант. Выбор "
                                 "родителей из северных регионов</blockquote>"
                     },
-                    "save": {"road_conditions": ["offroad", "snow"]}
+                    "save": {"road_conditions": "offroad and snow"}
                 }
             },
             "next_level": None
@@ -345,7 +345,7 @@ QUIZ_CONFIG = {
                         "photo": "AgACAgIAAxkDAAIxGmlhIFXxO8sdL1t5ysb7M9yRAWULAAJ4C2sbEv8QS0rXGIJ6uqGJAQADAgADeAADOAQ",
                         "text": "<blockquote>Коляска для малышей которые уже умеют сидеть</blockquote>"
                     },
-                    "save": {"stroller_type": ["stroller", "The_child's_age_is_from_6_months"]}
+                    "save": {"stroller_type": "stroller"}
                 }
             },
             "next_level": None
