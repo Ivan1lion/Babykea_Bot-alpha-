@@ -8,7 +8,7 @@ from aiogram import Router, Bot
 from app.comands_menu.text_for_user import text_offer
 from app.db.models import User, Magazine
 from app.db.crud import stop_if_no_promo
-from app.handlers.keyboards import magazine_map_kb
+from app.handlers.keyboards import magazine_map_kb, get_ai_mode_kb
 
 
 
@@ -68,25 +68,37 @@ async def policy_cmd(message: Message, session: AsyncSession):
 
 
 
-@menu_cmds_router.message(Command("ai_consultant"))
-async def policy_cmd(message: Message, bot: Bot, session: AsyncSession):
+# @menu_cmds_router.message(Command("ai_consultant"))
+# async def policy_cmd(message: Message, bot: Bot, session: AsyncSession):
+#
+#     if await stop_if_no_promo(message=message, session=session):
+#         return
+#
+#     await message.answer(f" Для использования AI-консультанта выберити ниже подходяшую кнопку")
+#     # result = await session.execute(select(User).where(User.telegram_id == message.from_user.id))
+#     # user = result.scalar_one_or_none()
+#     # if user.requests_left == 0:
+#     #     await message.answer(f"🚫 У вас закончились запросы"
+#     #                          f"\n\nПожалуйста, пополните баланс", reply_markup=kb.pay)
+#     #     return
+#     # text_balance = (f"Количество запросов\n"
+#     #                 f"на вашем балансе: [ {user.requests_left} ]"
+#     #                 f"\n\nПополнить баланс можно через кнопки ниже")
+#     # await message.answer(text_balance, reply_markup=kb.pay)
 
+
+@menu_cmds_router.message(Command("ai_consultant"))
+async def cmd_ai_consultant(message: Message, session: AsyncSession):
     if await stop_if_no_promo(message=message, session=session):
         return
 
-    await message.answer(f" 1. Видео или статья о том как пользоваться консультантом"
-                         f"\n\n 2. Баланс (кол-во запросов)")
-    # result = await session.execute(select(User).where(User.telegram_id == message.from_user.id))
-    # user = result.scalar_one_or_none()
-    # if user.requests_left == 0:
-    #     await message.answer(f"🚫 У вас закончились запросы"
-    #                          f"\n\nПожалуйста, пополните баланс", reply_markup=kb.pay)
-    #     return
-    # text_balance = (f"Количество запросов\n"
-    #                 f"на вашем балансе: [ {user.requests_left} ]"
-    #                 f"\n\nПополнить баланс можно через кнопки ниже")
-    # await message.answer(text_balance, reply_markup=kb.pay)
-
+    await message.answer(
+        "🤖 **AI-Консультант готов к работе!**\n\n"
+        "Я умею подбирать коляски с учетом наличия в магазине, "
+        "а также отвечать на любые вопросы по эксплуатации.\n\n"
+        "👇 *Выберите режим работы:*",
+        reply_markup=get_ai_mode_kb(),
+    )
 
 
 

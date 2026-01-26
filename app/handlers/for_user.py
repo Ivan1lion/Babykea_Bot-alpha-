@@ -34,7 +34,7 @@ from app.openai_assistant.responses_client import ask_responses_api
 from app.openai_assistant.prompts_config import get_system_prompt, get_marketing_footer
 from app.payments.pay_config import PAYMENTS
 from app.services.search_service import search_in_pinecone
-from app.services.classifier import classify_intent
+
 
 
 
@@ -46,6 +46,10 @@ for_user_router = Router()
 
 class ActivationState(StatesGroup):
     waiting_for_promo_code = State()
+
+class AIChat(StatesGroup):
+    catalog_mode = State()  # Режим подбора (работает Pinecone / Feed)
+    info_mode = State()     # Режим вопросов (работает Google Search / Общие знания)
 
 
 # команд СТАРТ
@@ -96,10 +100,8 @@ async def activation(call: CallbackQuery):
 
 @for_user_router.callback_query(F.data == "enter_promo")
 async def enter_promo(call: CallbackQuery, state: FSMContext):
-    await call.message.edit_reply_markup(reply_markup=None)
-
+    # await call.message.edit_reply_markup(reply_markup=None)
     await state.set_state(ActivationState.waiting_for_promo_code)
-
     await call.message.answer("Введите код активации текстом:")
     await call.answer()
 
@@ -112,7 +114,9 @@ async def process_promo_code(
     state: FSMContext,
     session: AsyncSession,
     bot: Bot,
-):
+    delete_delay: int = 2
+) -> bool:
+
     promo_code = message.text.strip().upper()
 
     result = await session.execute(
@@ -121,7 +125,9 @@ async def process_promo_code(
     magazine = result.scalar_one_or_none()
 
     if not magazine:
-        await message.answer("Увы, данный код не действителен")
+        warn_promo = await message.answer("Увы, данный код не действителен или произошла ошибка соединения. Попробуйте ещё раз")
+        await asyncio.sleep(delete_delay)
+        await warn_promo.delete()
         return
 
     # обновляем пользователя
@@ -144,7 +150,7 @@ async def process_promo_code(
             chat_id=message.chat.id,
             from_chat_id=-1003498991864,  # ID группы
             message_id=4,  # ID сообщения из группы
-            reply_markup=kb.instructions_for_bot
+            # reply_markup=kb.
         )
 
 
@@ -158,13 +164,33 @@ async def send_typing(bot, chat_id, stop_event):
         await asyncio.sleep(4.5)
 
 
-@for_user_router.message(F.text)
-async def handle_text(message: Message, session: AsyncSession, bot: Bot):
-    # 1. Проверка промокода (твоя логика)
-    if await stop_if_no_promo(message=message, session=session):
-        return
+# ==========================================
+# 1. ОБРАБОТКА КНОПОК (ВЫБОР РЕЖИМА)
+# ==========================================
+@for_user_router.callback_query(F.data.in_({"mode_catalog", "mode_info"}))
+async def process_mode_selection(callback: CallbackQuery, state: FSMContext):
+    mode = callback.data
 
-    # 2. Получаем пользователя
+    if mode == "mode_catalog":
+        await state.set_state(AIChat.catalog_mode)
+        text = "👶 **Режим: Подбор коляски**\n\nОпишите, какую коляску вы ищете (например: *'Легкая для самолета'* или *'Вездеход для зимы'*)."
+    else:
+        await state.set_state(AIChat.info_mode)
+        text = "❓ **Режим: Вопрос эксперту**\n\nЗадайте любой вопрос (например: *'Что лучше: Anex или Tutis?'* или *'Как смазать колеса?'*)."
+
+    await callback.message.edit_text(text, parse_mode=ParseMode.MARKDOWN)
+    await callback.answer()
+
+
+# ==========================================
+# 2. ОБРАБОТКА ТЕКСТА (С УЧЕТОМ РЕЖИМА)
+# ==========================================
+@for_user_router.message(F.text, AIChat.catalog_mode)
+@for_user_router.message(F.text, AIChat.info_mode)
+async def handle_ai_message(message: Message, state: FSMContext, session: AsyncSession, bot: Bot):
+    # Проверки (промокод, баланс...)
+    if await stop_if_no_promo(message=message, session=session): return
+
     result = await session.execute(select(User).where(User.telegram_id == message.from_user.id))
     user = result.scalar_one_or_none()
     if not user: return
@@ -173,37 +199,32 @@ async def handle_text(message: Message, session: AsyncSession, bot: Bot):
         await message.answer("🚫 Запросы закончились. Пополните баланс.", reply_markup=kb.pay)
         return
 
-    # Запускаем "печатает..."
+    # Получаем текущий режим (state)
+    current_state = await state.get_state()
+    is_catalog_mode = (current_state == AIChat.catalog_mode.state)
+
     stop_event = asyncio.Event()
     typing_task = asyncio.create_task(send_typing(bot, message.chat.id, stop_event))
-    typing_msg = await message.answer("🤔 Анализирую запрос...")
+    typing_msg = await message.answer("🤔 Думаю..." if not is_catalog_mode else "🔍 Ищу варианты...")
 
     try:
-        # ==========================================
-        # 1. ОПРЕДЕЛЯЕМ НАМЕРЕНИЕ (INTENT)
-        # ==========================================
-        # CATALOG, INFO или SUPPORT
-        intent = await classify_intent(message.text)
-        logger.info(f"Intention detected: {intent}")
-
-        # ==========================================
-        # 2. ПОДГОТОВКА ДАННЫХ
-        # ==========================================
-
-        # Данные магазина
+        # --- СБОР ДАННЫХ ---
         mag_result = await session.execute(select(Magazine).where(Magazine.id == user.magazine_id))
         current_magazine = mag_result.scalar_one_or_none()
 
-        # Данные квиза
         quiz_data_str = "Нет данных."
         quiz_json_obj = {}
+        user_branch = "pregnant"  # Дефолт
 
         quiz_result = await session.execute(
             select(UserQuizProfile).where(UserQuizProfile.user_id == user.id).order_by(UserQuizProfile.id.desc()).limit(
                 1)
         )
         quiz_profile = quiz_result.scalar_one_or_none()
+
         if quiz_profile:
+            if quiz_profile.branch:
+                user_branch = quiz_profile.branch
             try:
                 if isinstance(quiz_profile.data, str):
                     quiz_json_obj = json.loads(quiz_profile.data)
@@ -214,61 +235,42 @@ async def handle_text(message: Message, session: AsyncSession, bot: Bot):
             except:
                 pass
 
-        # ==========================================
-        # 3. ЛОГИКА ВЕТВЛЕНИЯ (ГЛАВНАЯ ЧАСТЬ)
-        # ==========================================
-
+        # --- ЛОГИКА ПОИСКА (ТОЛЬКО ДЛЯ CATALOG MODE) ---
         products_context = ""
         final_shop_url = None
 
-        # --- ВЕТКА CATALOG (ПОДБОР) ---
-        if intent == "CATALOG":
-
-            # Логика магазина (A/B/C)
+        if is_catalog_mode:
+            # Тут работает Pinecone или Site Search
             if current_magazine:
                 feed_url = current_magazine.feed_url
 
-                # СЦЕНАРИЙ "ФЛАГ": Google Search (старая логика)
                 if feed_url == "Google_Search":
                     final_shop_url = current_magazine.url_website
-                    # Pinecone НЕ используем
-
-                # СЦЕНАРИЙ "ЕСТЬ ФИД": Pinecone (конкретный магазин)
                 elif feed_url:
+                    # Поиск в базе по ID магазина
                     products_context = await search_in_pinecone(
                         user_query=message.text,
                         quiz_json=quiz_json_obj,
-                        magazine_id=current_magazine.id,  # Фильтр по ID
+                        magazine_id=current_magazine.id,
                         top_k=5
                     )
-
-                # СЦЕНАРИЙ "ПУСТОЙ ФИД": Pinecone (глобальный поиск)
                 else:
-                    products_context = await search_in_pinecone(
-                        user_query=message.text,
-                        quiz_json=quiz_json_obj,
-                        magazine_id=None,  # Ищем везде
-                        top_k=5
-                    )
+                    # Поиск в базе везде (если нет фида у магазина, но режим подбора)
+                    products_context = await search_in_pinecone(message.text, quiz_json_obj, None)
             else:
-                # Если магазин вообще не привязан - ищем везде в Pinecone
                 products_context = await search_in_pinecone(message.text, quiz_json_obj, None)
 
-        # --- ВЕТКА INFO / SUPPORT ---
-        else:
-            # Для сравнения и ремонта нам не нужен Pinecone и привязка к магазину.
-            # Мы разрешим AI гуглить везде.
-            pass
+        # Если режим INFO - мы просто пропускаем блок выше, products_context остается пустым,
+        # и get_system_prompt выдаст шаблон эксперта.
 
-        # ==========================================
-        # 4. ГЕНЕРАЦИЯ ОТВЕТА
-        # ==========================================
+        # --- ГЕНЕРАЦИЯ ---
+        mode_key = "catalog_mode" if is_catalog_mode else "info_mode"
 
         system_prompt = get_system_prompt(
-            intent=intent,
+            mode=mode_key,
             quiz_data=quiz_data_str,
-            shop_url=final_shop_url,  # Будет заполнено только если "Google_Search"
-            products_context=products_context  # Будет заполнено если RAG
+            shop_url=final_shop_url,
+            products_context=products_context
         )
 
         answer = await ask_responses_api(
@@ -276,9 +278,13 @@ async def handle_text(message: Message, session: AsyncSession, bot: Bot):
             system_instruction=system_prompt
         )
 
-        # Добавляем футер
-        answer += get_marketing_footer(intent)
+        # --- ФУТЕР (ТОЛЬКО ПЕРВЫЙ РАЗ) ---
+        if user.is_first_request:
+            marketing_footer = get_marketing_footer(user_branch)
+            answer += marketing_footer
+            user.is_first_request = False
 
+        # --- ОТПРАВКА ---
         try:
             await message.answer(answer, parse_mode=ParseMode.MARKDOWN, disable_web_page_preview=True)
         except TelegramBadRequest:
@@ -301,131 +307,19 @@ async def handle_text(message: Message, session: AsyncSession, bot: Bot):
             pass
 
 
+# ==========================================
+# 4. ЛОВУШКА ДЛЯ ТЕКСТА БЕЗ РЕЖИМА
+# ==========================================
+@for_user_router.message(F.text)
+async def handle_no_state(message: Message, session: AsyncSession):
+    """Если юзер пишет текст, но не выбрал кнопку -> показываем меню"""
+    if await stop_if_no_promo(message=message, session=session):
+        return
 
-
-
-
-
-
-
-
-                                   #Рабочий хэндлер до всей той штуки с векторными БД. Использовать его в случае фивско
-# @for_user_router.message(F.text)
-# async def handle_text(message: Message, session: AsyncSession, bot: Bot):
-#     # 1. Проверка промокода (твоя логика)
-#     if await stop_if_no_promo(message=message, session=session):
-#         return
-#
-#     # 2. Получаем пользователя
-#     result = await session.execute(select(User).where(User.telegram_id == message.from_user.id))
-#     user = result.scalar_one_or_none()
-#
-#     if not user:
-#         return  # Или ошибка "пользователь не найден"
-#
-#     # 3. Проверка баланса
-#     if user.requests_left <= 0:
-#         await message.answer(
-#             f"🚫 У вас закончились запросы\n\n"
-#             f"Чтобы продолжить поиск, подбор и сравнение колясок - пополните запросы"
-#             f"\n\n<a href='https://telegra.ph/AI-konsultant-rabotaet-na-platnoj-platforme-httpsplatformopenaicom-01-16'>"
-#             "(Почему запросы платные?)</a>",
-#             reply_markup=kb.pay
-#         )
-#         return
-#
-#     # --- СБОР ДАННЫХ ДЛЯ КОНТЕКСТА ---
-#
-#     # А. Получаем URL магазина
-#     shop_url = None  # Дефолтный (Глобальный поиск), если не найдем
-#
-#     if user.magazine_id:  # Если связь через ID
-#         mag_result = await session.execute(select(Magazine.url_website).where(Magazine.id == user.magazine_id))
-#         shop_url = mag_result.scalar() or shop_url
-#
-#     # Б. Получаем данные квиза (предпочтения пользователя)
-#     # JSONB обычно возвращается как dict в Python
-#     quiz_data_str = "Данные о предпочтениях отсутствуют."
-#     user_branch = "pregnant"  # Значение по умолчанию (если ветка не найдена)
-#
-#     quiz_result = await session.execute(
-#         select(UserQuizProfile)
-#         .where(UserQuizProfile.user_id == user.id)
-#         .order_by(UserQuizProfile.id.desc())
-#         .limit(1)
-#     )
-#     quiz_profile = quiz_result.scalar_one_or_none()
-#
-#     if quiz_profile:
-#         # 1. Определяем ветку пользователя
-#         if quiz_profile.branch:
-#             user_branch = quiz_profile.branch
-#
-#         # 2. Форматируем JSON
-#         try:
-#             raw_data = quiz_profile.data
-#             if isinstance(raw_data, str):
-#                 quiz_data_str = raw_data
-#             else:
-#                 quiz_data_str = json.dumps(raw_data, ensure_ascii=False, indent=2)
-#         except Exception:
-#             quiz_data_str = str(quiz_profile.data)
-#
-#         # --- ПОЛУЧАЕМ СИСТЕМНЫЙ ПРОМПТ ---
-#         system_prompt = get_system_prompt(
-#             branch=user_branch,
-#             quiz_data=quiz_data_str,
-#             shop_url=shop_url
-#         )
-#
-#     # --- ЗАПУСК ОБРАБОТКИ ---
-#     stop_event = asyncio.Event()
-#     typing_task = asyncio.create_task(send_typing(bot, message.chat.id, stop_event))
-#     typing_msg = await message.answer("Ваш запрос обрабатывается и готовится ответ 💬")
-#
-#     try:
-#         # 🔥 Генерация ответа AI
-#         answer = await ask_responses_api(
-#             user_message=message.text,
-#             system_instruction=system_prompt
-#         )
-#         # --- ЛОГИКА ПЕРВОГО ЗАПРОСА (МАРКЕТИНГ) ---
-#         if user.is_first_request:
-#             # 👇 Выбираем правильный футер в зависимости от ветки (user_branch)
-#             marketing_footer = get_marketing_footer(user_branch)
-#             # Приклеиваем его к ответу
-#             answer += marketing_footer
-#             # Снимаем флаг
-#             user.is_first_request = False
-#         # --- ОТПРАВКА ---
-#         try:
-#             await message.answer(answer, parse_mode=ParseMode.MARKDOWN, disable_web_page_preview=True)
-#         except TelegramBadRequest as e:
-#             logger.warning(f"Markdown error: {e}")
-#             await message.answer(answer, parse_mode=None, disable_web_page_preview=True)
-#
-#         # ✅ Списание баланса (только при успехе)
-#         user.requests_left -= 1
-#         await session.commit()
-#
-#     except Exception as e:
-#         logger.error(f"Ошибка в хэндлере: {e}", exc_info=True)
-#         await message.answer(
-#             '⚠️ Произошла ошибка при обработке запроса. '
-#             'Пожалуйста, повторите попытку позже.'
-#         )
-#     finally:
-#         # Убираем индикаторы
-#         stop_event.set()
-#         typing_task.cancel()
-#         with contextlib.suppress(asyncio.CancelledError):
-#             await typing_task
-#         try:
-#             await typing_msg.delete()
-#         except:
-#             pass
-
-
+    await message.answer(
+        "👋 Чтобы я мог помочь, выберите, пожалуйста, режим работы:",
+        reply_markup=kb.get_ai_mode_kb()
+    )
 
 
 

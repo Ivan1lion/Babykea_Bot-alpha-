@@ -26,7 +26,7 @@ class Magazine(Base):
         index=True,
         nullable=False
     )
-    feed_url = Column(String, nullable=True)  # Ссылка на YML файл (может быть пустой)
+    feed_url = Column(String, nullable=True)  # Ссылка на YML файл (может быть пустой)/ Если поставить "Google_Search" - то ответы только из поиска
     name: Mapped[str] = mapped_column(String(150), nullable=False)
     city: Mapped[str] = mapped_column(String(100), nullable=True)
     address: Mapped[str] = mapped_column(String(255), nullable=True)

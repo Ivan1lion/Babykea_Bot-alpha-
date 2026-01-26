@@ -1,4 +1,5 @@
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 
 quiz_start = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="Далее 👉",
@@ -18,9 +19,15 @@ kb_activation = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text
 
 
 
-#Инструкция к боту (переход по ссылки на статью)
-instructions_for_bot = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="Инструкция к боту",
-                                                                         url="https://telegra.ph/Navigaciya-01-15-10")]])
+#Для выбора типа использования AI
+def get_ai_mode_kb():
+    kb = InlineKeyboardBuilder()
+    kb.button(text="👶 Подобрать коляску", callback_data="mode_catalog")
+    kb.button(text="❓ Другой вопрос", callback_data="mode_info")
+    kb.adjust(1) # Кнопки одна под другой
+    return kb.as_markup()
+
+
 
 
 activation_kb = InlineKeyboardMarkup(
