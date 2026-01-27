@@ -197,10 +197,10 @@ async def handle_ai_message(message: Message, state: FSMContext, session: AsyncS
 
     if user.requests_left <= 0:
         await message.answer(
-            f"🚫 У вас закончились запросы\n\n"
-            f"Чтобы продолжить поиск, подбор и сравнение колясок - пополните запросы"
+            f"💡 Чтобы я мог выдать точный результат и завершить персональный анализ под ваши условия, выберите "
+            f"пакет запросов ниже"
             f"\n\n<a href='https://telegra.ph/AI-konsultant-rabotaet-na-platnoj-platforme-httpsplatformopenaicom-01-16'>"
-            "(Почему запросы платные?)</a>",
+            "(Как это работает и что считается запросом?)</a>",
             reply_markup=kb.pay
         )
         return
@@ -258,7 +258,7 @@ async def handle_ai_message(message: Message, state: FSMContext, session: AsyncS
                         user_query=message.text,
                         quiz_json=quiz_json_obj,
                         magazine_id=current_magazine.id,
-                        top_k=5
+                        top_k=10
                     )
                 else:
                     # Поиск в базе везде (если нет фида у магазина, но режим подбора)

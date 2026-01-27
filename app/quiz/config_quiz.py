@@ -257,7 +257,7 @@ QUIZ_CONFIG = {
                                 "слабую проходимость и ограниченную функциональность. Тяжело вести коляску "
                                 "одной рукой</blockquote>"
                     },
-                    "save": {"subtype": "коляска-трость"}
+                    "save": {"subtype": "stroller_folds_like_a_cane"}
                 },
                 "progylka": {
                     "button": "Цельная",
