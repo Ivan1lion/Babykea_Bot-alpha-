@@ -196,7 +196,13 @@ async def handle_ai_message(message: Message, state: FSMContext, session: AsyncS
     if not user: return
 
     if user.requests_left <= 0:
-        await message.answer("🚫 Запросы закончились. Пополните баланс.", reply_markup=kb.pay)
+        await message.answer(
+            f"🚫 У вас закончились запросы\n\n"
+            f"Чтобы продолжить поиск, подбор и сравнение колясок - пополните запросы"
+            f"\n\n<a href='https://telegra.ph/AI-konsultant-rabotaet-na-platnoj-platforme-httpsplatformopenaicom-01-16'>"
+            "(Почему запросы платные?)</a>",
+            reply_markup=kb.pay
+        )
         return
 
     # Получаем текущий режим (state)
@@ -286,8 +292,11 @@ async def handle_ai_message(message: Message, state: FSMContext, session: AsyncS
 
         # --- ОТПРАВКА ---
         try:
-            await message.answer(answer, parse_mode=ParseMode.MARKDOWN, disable_web_page_preview=True)
-        except TelegramBadRequest:
+            # 🔥 ВАЖНО: Используем HTML
+            await message.answer(answer, parse_mode=ParseMode.HTML, disable_web_page_preview=True)
+        except TelegramBadRequest as e:
+            # Если даже HTML сломался (очень редко), логируем и шлем текст
+            logger.error(f"HTML Parse Error: {e}")
             await message.answer(answer, parse_mode=None, disable_web_page_preview=True)
 
         user.requests_left -= 1

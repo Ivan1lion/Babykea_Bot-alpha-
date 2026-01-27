@@ -22,8 +22,8 @@ kb_activation = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text
 #Для выбора типа использования AI
 def get_ai_mode_kb():
     kb = InlineKeyboardBuilder()
-    kb.button(text="👶 Подобрать коляску", callback_data="mode_catalog")
-    kb.button(text="❓ Другой вопрос", callback_data="mode_info")
+    kb.button(text="🎯 Подобрать коляску", callback_data="mode_catalog")
+    kb.button(text="❓ Другой запрос", callback_data="mode_info")
     kb.adjust(1) # Кнопки одна под другой
     return kb.as_markup()
 
