@@ -33,7 +33,7 @@ from app.posting.dispatcher import dispatch_post
 from app.openai_assistant.responses_client import ask_responses_api
 from app.openai_assistant.prompts_config import get_system_prompt, get_marketing_footer
 from app.payments.pay_config import PAYMENTS
-from app.services.search_service import search_in_pinecone
+from app.services.search_service import search_products
 
 
 
@@ -254,7 +254,7 @@ async def handle_ai_message(message: Message, state: FSMContext, session: AsyncS
                     final_shop_url = current_magazine.url_website
                 elif feed_url:
                     # Поиск в базе по ID магазина
-                    products_context = await search_in_pinecone(
+                    products_context = await search_products(
                         user_query=message.text,
                         quiz_json=quiz_json_obj,
                         magazine_id=current_magazine.id,
@@ -262,9 +262,9 @@ async def handle_ai_message(message: Message, state: FSMContext, session: AsyncS
                     )
                 else:
                     # Поиск в базе везде (если нет фида у магазина, но режим подбора)
-                    products_context = await search_in_pinecone(message.text, quiz_json_obj, None)
+                    products_context = await search_products(message.text, quiz_json_obj, None)
             else:
-                products_context = await search_in_pinecone(message.text, quiz_json_obj, None)
+                products_context = await search_products(message.text, quiz_json_obj, None)
 
         # Если режим INFO - мы просто пропускаем блок выше, products_context остается пустым,
         # и get_system_prompt выдаст шаблон эксперта.
