@@ -69,7 +69,7 @@ def parse_offers_from_xml(xml_content: str) -> List[Dict]:
                 continue
 
             name = offer.findtext("name") or offer.findtext("model")
-            description = offer.findtext("description") or ""
+            raw_description = offer.findtext("description") or ""
             url = offer.findtext("url")
             price = offer.findtext("price")
             vendor = offer.findtext("vendor") or ""
@@ -91,7 +91,9 @@ def parse_offers_from_xml(xml_content: str) -> List[Dict]:
             full_description = f"Характеристики: {params_str}. Описание: {raw_description}"
             # --- КОНЕЦ БЛОКА ---
 
-            full_text_for_search = f"{name} {vendor} {description} Цена: {price}".strip()
+            # Текст для Вектора (OpenAI Embeddings)
+            # Теперь поиск будет находить "легкую коляску", потому что "Вес: 10кг" есть в векторе
+            full_text_for_search = f"{name} {vendor} {params_str} {raw_description} Цена: {price}".strip()
 
             if name and url:
                 products.append({
@@ -101,7 +103,8 @@ def parse_offers_from_xml(xml_content: str) -> List[Dict]:
                         "name": name,
                         "url": url,
                         "price": price,
-                        "description": description[:1000]
+                        # Обрезаем описание товара до 3000 символов
+                        "description": full_description[:3000]
                     }
                 })
     except Exception as e:

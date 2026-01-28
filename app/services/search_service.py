@@ -143,7 +143,7 @@ async def search_in_pinecone(
             name = meta.get('name', 'Без названия')
             price = meta.get('price', 'Цена не указана')
             url = meta.get('url', '#')
-            desc = meta.get('description', '')[:1000]  # Обрезаем текст описания для AI
+            desc = meta.get('description', '')[:3000]  # Обрезаем текст описания для AI
 
             # Превращаем 0.89123 в 89%
             relevance_percent = int(score * 100)
