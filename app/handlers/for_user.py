@@ -88,7 +88,11 @@ async def activation(call: CallbackQuery):
     await call.message.edit_reply_markup(reply_markup=None)
 
     await call.message.answer(
-        "Вы можете оплатить доступ к боту или активировать его по промо-коду",
+        "<b>Для активации полного функционала Babykea выберите подходящий способ:</b>"
+        "\n\n🎁 <b>Если у вас есть флаер от магазина-партнера</b> — нажмите «Ввести код активации» и получите полный "
+        "доступ бесплатно"
+        "\n\n<b>Если промокода нет:</b> — вы можете оплатить разовый доступ ко всем разделам (+50 запросов к "
+        "AI-ассистенту) за 1900 ₽",
         reply_markup=kb.activation_kb,
     )
     await call.answer()
@@ -140,18 +144,12 @@ async def process_promo_code(
     user.magazine_id = magazine.id
 
     await session.commit()
-
     await state.clear()
-
-    await message.answer(f'✅ Проведена успешная активация по промокоду магазина детских колясок "{magazine.name}"\n\n'
+    await message.answer(text=f'✅ Проведена успешная активация по промокоду магазина детских колясок "{magazine.name}"\n\n'
                          f'Контакты продавца будут находиться в меню в разделе\n'
-                         f'"📍 Магазин колясок"')
-    await bot.copy_message(
-            chat_id=message.chat.id,
-            from_chat_id=-1003498991864,  # ID группы
-            message_id=4,  # ID сообщения из группы
-            # reply_markup=kb.
-        )
+                         f'"📍 Магазин колясок"',
+                         reply_markup=kb.first_request)
+
 
 
 ######################### Обработка запросов пользователя к AI #########################
@@ -165,6 +163,139 @@ async def send_typing(bot, chat_id, stop_event):
 
 
 # ==========================================
+# 0. ОБРАБОТКА КНОПКИ "ПОДОБРАТЬ КОЛЯСКУ" (АВТО-ЗАПРОС)
+# ==========================================
+@for_user_router.callback_query(F.data == "first_request")
+async def process_first_auto_request(call: CallbackQuery, state: FSMContext, session: AsyncSession, bot: Bot):
+    await call.answer()
+    # 2. Переключаем режим сразу на "Каталог"
+    await state.set_state(AIChat.catalog_mode)
+
+    # 3. Получаем юзера
+    result = await session.execute(select(User).where(User.telegram_id == call.from_user.id))
+    user = result.scalar_one_or_none()
+    if not user: return
+
+    # Проверка лимитов
+    if user.requests_left <= 0:
+        await message.answer(
+            f"💡 Чтобы я мог выдать точный результат и завершить персональный анализ под ваши условия, выберите "
+            f"пакет запросов ниже"
+            f"\n\n<a href='https://telegra.ph/AI-konsultant-rabotaet-na-platnoj-platforme-httpsplatformopenaicom-01-16'>"
+            "(Как это работает и что считается запросом?)</a>",
+            reply_markup=kb.pay
+        )
+        return
+
+    # 4. Визуальная индикация работы
+    # Можно отправить стикер или текст
+    typing_msg = await call.message.answer("🤔 Анализирую ваши ответы из квиза и ищу лучшие варианты...")
+
+    # Запускаем "печатание"
+    stop_event = asyncio.Event()
+    typing_task = asyncio.create_task(send_typing(bot, call.message.chat.id, stop_event))
+
+    try:
+        # --- СБОР ДАННЫХ (Копия логики из main handler) ---
+        mag_result = await session.execute(select(Magazine).where(Magazine.id == user.magazine_id))
+        current_magazine = mag_result.scalar_one_or_none()
+
+        # Достаем ответы на квиз
+        quiz_data_str = "Нет данных."
+        quiz_json_obj = {}
+        user_branch = "pregnant"
+
+        quiz_result = await session.execute(
+            select(UserQuizProfile).where(UserQuizProfile.user_id == user.id).order_by(UserQuizProfile.id.desc()).limit(
+                1)
+        )
+        quiz_profile = quiz_result.scalar_one_or_none()
+
+        if quiz_profile:
+            if quiz_profile.branch:
+                user_branch = quiz_profile.branch
+            try:
+                if isinstance(quiz_profile.data, str):
+                    quiz_json_obj = json.loads(quiz_profile.data)
+                    quiz_data_str = quiz_profile.data
+                else:
+                    quiz_json_obj = quiz_profile.data
+                    quiz_data_str = json.dumps(quiz_profile.data, ensure_ascii=False)
+            except:
+                pass
+
+        # --- ПОИСК В БАЗЕ ---
+        # Ключевой момент: user_query="" (пустая строка)
+        # Search Service склеит: "" + "перевод_квиза"
+        # И поиск пойдет ТОЛЬКО по характеристикам из квиза.
+
+        products_context = ""
+        final_shop_url = None
+
+        if current_magazine:
+            feed_url = current_magazine.feed_url
+            if feed_url == "Google_Search":
+                final_shop_url = current_magazine.url_website
+            elif feed_url:
+                # Поиск в ChromaDB по ID магазина
+                products_context = await search_products(
+                    user_query="",  # <--- ПУСТОЙ ЗАПРОС
+                    quiz_json=quiz_json_obj,
+                    magazine_id=current_magazine.id,
+                    top_k=10
+                )
+            else:
+                products_context = await search_products("", quiz_json_obj, None)
+        else:
+            products_context = await search_products("", quiz_json_obj, None)
+
+        # --- ГЕНЕРАЦИЯ ОТВЕТА ---
+        system_prompt = get_system_prompt(
+            mode="catalog_mode",
+            quiz_data=quiz_data_str,
+            shop_url=final_shop_url,
+            products_context=products_context
+        )
+
+        # Сюда можно передать вводную фразу, чтобы AI понимал контекст
+        fake_user_message = "Подбери мне подходящую коляску"
+
+        answer = await ask_responses_api(
+            user_message=fake_user_message,
+            system_instruction=system_prompt
+        )
+
+        # --- ФУТЕР (Маркетинг) ---
+        if user.is_first_request:
+            marketing_footer = get_marketing_footer(user_branch)
+            answer += marketing_footer
+            user.is_first_request = False
+
+        # --- ОТПРАВКА ---
+        # Удаляем сообщение "Анализирую..."
+        await typing_msg.delete()
+
+        try:
+            await call.message.answer(answer, parse_mode=ParseMode.HTML, disable_web_page_preview=True)
+        except Exception:
+            await call.message.answer(answer, parse_mode=None, disable_web_page_preview=True)
+
+        # Списываем запрос
+        user.requests_left -= 1
+        await session.commit()
+
+    except Exception as e:
+        logger.error(f"Error in auto-request: {e}", exc_info=True)
+        await call.message.answer("⚠️ Произошла ошибка на сервере. Нажмите кнопку еще раз.")
+    finally:
+        stop_event.set()
+        typing_task.cancel()
+
+
+
+
+
+# ==========================================
 # 1. ОБРАБОТКА КНОПОК (ВЫБОР РЕЖИМА)
 # ==========================================
 @for_user_router.callback_query(F.data.in_({"mode_catalog", "mode_info"}))
@@ -173,12 +304,14 @@ async def process_mode_selection(callback: CallbackQuery, state: FSMContext):
 
     if mode == "mode_catalog":
         await state.set_state(AIChat.catalog_mode)
-        text = "👶 **Режим: Подбор коляски**\n\nОпишите, какую коляску вы ищете (например: *'Легкая для самолета'* или *'Вездеход для зимы'*)."
+        text = ("👶 **Режим: Подбор коляски**\n\nОпишите, какую коляску вы ищете (например: *'Легкая для самолета'* или "
+                "*'Вездеход для зимы'*).")
     else:
         await state.set_state(AIChat.info_mode)
-        text = "❓ **Режим: Вопрос эксперту**\n\nЗадайте любой вопрос (например: *'Что лучше: Anex или Tutis?'* или *'Как смазать колеса?'*)."
+        text = ("❓ **Режим: Вопрос эксперту**\n\nЗадайте любой вопрос (например: *'Что лучше: Anex или Tutis?'* или "
+                "*'Как смазать колеса?'*).")
 
-    await callback.message.edit_text(text, parse_mode=ParseMode.MARKDOWN)
+    await callback.message.edit_text(text)
     await callback.answer()
 
 

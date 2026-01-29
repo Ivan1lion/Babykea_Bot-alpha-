@@ -14,8 +14,14 @@ quiz_false = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="�
 
 
 #Переход к авторизации пользователя
-kb_activation = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="Получить доступ",
+kb_activation = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="🔓 Получить доступ",
                                                                          callback_data="kb_activation")]])
+
+
+
+#Отправка 1го автоматического запроса к AI
+first_request = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="Подобрать коляску 🎯",
+                                                                         callback_data="first_request")]])
 
 
 
