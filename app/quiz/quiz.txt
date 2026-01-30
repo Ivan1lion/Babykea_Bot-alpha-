@@ -246,30 +246,6 @@ video.mp4 -> AgACAgIAAxkDAAIxG2lhIGY0e7z2cwjET_DULygAARcTIAACeQtrGxL_EEu3qpkOzJt
 гиф завершения квиза -> CgACAgQAAxkBAAIxe2liVpUmUuaoAAEWiAq4dZsc4CTygQACBAMAAvYbHVNpZ9ehQ-1QTjgE
 
 
-{
-  "stroller_type": "from_birth", "stroller"
-  "from_birth_subtype": "2in1", "3in1", "transformer"
-  "road_conditions": ["ground", "soil"], "asphalt", ["soil", "asphalt"], ["offroad", "snow"],
-  "usage_format": ["daily_walks", "car_trips", "air_travel"],
-  "season_start": "winter", "summer"
 
 
-  "performance_requirements": {
-    "high_passability": true
-  },
-  "store": {
-    "url": "https://example-shop.ru"
-  }
-}
-
-
-
-
-{
-  "формат использования": "Для ежедневных прогулок", "Для частых поездок в автомобиле", "Для путешествий в самолете"
-  "тип коляски": "для новорожденного", "прогулочная коляска",
-  "функциональность коляски": "2 в 1", "3 в 1", "люлька-трансформер",
-  "тип дорог по которым будет ездеть коляска": "грунт", "асфальт", "грунт, асфальт и тротуарная плитка", "бездорожье, глубокий снег"
-  "сезонность": "Для использования летом", "Для использования зимой"
-}
 
