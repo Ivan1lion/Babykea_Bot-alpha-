@@ -14,14 +14,19 @@ quiz_false = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="�
 
 
 #Переход к авторизации пользователя
-kb_activation = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="🔓 Получить доступ",
+kb_activation = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="Всё ясно, погнали! 🚀",
                                                                          callback_data="kb_activation")]])
 
 
 
-#Отправка 1го автоматического запроса к AI
+#Отправка 1го автоматического запроса к AI, если пользователь branch != 'service_only'
 first_request = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="Подобрать коляску 🎯",
+
+
                                                                          callback_data="first_request")]])
+#Кнопка после активации бота, если пользователь branch == 'service_only'
+manual_mode = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="Как не сломать коляску 🤔",
+                                                                         callback_data="manual_mode")]])
 
 
 

@@ -25,7 +25,7 @@ async def stop_if_no_promo(message: Message, session: AsyncSession, delete_delay
 
     # promo_code пустой → останавливаем
     await message.delete()
-    warn_message = await message.answer("Завершите настройку⤴️")
+    warn_message = await message.answer("Завершите действие⤴️")
     await asyncio.sleep(delete_delay)
     await warn_message.delete()
     return True

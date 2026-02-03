@@ -104,7 +104,6 @@ async def activation(call: CallbackQuery):
 
 @for_user_router.callback_query(F.data == "enter_promo")
 async def enter_promo(call: CallbackQuery, state: FSMContext):
-    # await call.message.edit_reply_markup(reply_markup=None)
     await state.set_state(ActivationState.waiting_for_promo_code)
     await call.message.answer("Введите код активации текстом:")
     await call.answer()
@@ -117,9 +116,8 @@ async def process_promo_code(
     message: Message,
     state: FSMContext,
     session: AsyncSession,
-    bot: Bot,
-    delete_delay: int = 10
-) -> bool:
+    bot: Bot
+):
 
     promo_code = message.text.strip().upper()
 
@@ -129,31 +127,52 @@ async def process_promo_code(
     magazine = result.scalar_one_or_none()
 
     if not magazine:
-        warn_promo = await message.answer("⚠️ <b>Код не сработал</b>"
+        await message.answer("⚠️ <b>Код не сработал</b>"
                                           "\n\nЭто не вина магазина — Вам выдали действующий код, просто система иногда "
                                           "может капризничать. Попробуйте ещё раз"
-                                          "\n\nЕсли опять не получится напишите мне @Master_PROkolyaski. Я лично проверю "
+                                          "\n\n<blockquote>Если опять не получится напишите мне @Master_PROkolyaski. Я лично проверю "
                                           "ваш промокод и открою доступ к видео и советам вручную, чтобы вы могли "
-                                          "продолжить без лишних нервов")
-        # await asyncio.sleep(delete_delay)
-        # await warn_promo.delete()
+                                          "продолжить без лишних нервов</blockquote>")
         return
 
-    # обновляем пользователя
-    result = await session.execute(
-        select(User).where(User.telegram_id == message.from_user.id)
-    )
-    user = result.scalar_one()
+        # 1. Обновляем пользователя (привязываем магазин)
+        result = await session.execute(
+            select(User).where(User.telegram_id == message.from_user.id)
+        )
+        user = result.scalar_one()
 
-    user.promo_code = promo_code
-    user.magazine_id = magazine.id
+        user.promo_code = promo_code
+        user.magazine_id = magazine.id
 
-    await session.commit()
-    await state.clear()
-    await message.answer(text=f'✅ Проведена успешная активация по промокоду магазина детских колясок "{magazine.name}"\n\n'
-                         f'Контакты продавца будут находиться в меню в разделе\n'
-                         f'"📍 Магазин колясок"',
-                         reply_markup=kb.first_request)
+        # 2. Узнаем branch пользователя (чтобы понять, какую кнопку дать)
+        # Берем последний заполненный квиз
+        quiz_result = await session.execute(
+            select(UserQuizProfile.branch)
+            .where(UserQuizProfile.user_id == user.id)
+            .order_by(UserQuizProfile.id.desc())
+            .limit(1)
+        )
+        branch = quiz_result.scalar_one_or_none()
+
+        await session.commit()
+        await state.clear()
+
+        # Текст сообщения одинаковый, меняется только клавиатура
+        success_text = (
+            f'✅ Проведена успешная активация по промокоду магазина детских колясок "{magazine.name}"\n\n'
+            f'Контакты продавца будут находиться в меню в разделе\n'
+            f'"📍 Магазин колясок"'
+        )
+
+        # 4. Проверка условия branch
+        if branch == 'service_only':
+            # ⚠️ ВНИМАНИЕ: Замени kb.manual_mode на название твоей клавиатуры "как не сломать"
+            # Если такой переменной нет в kb, создай её или используй существующую
+            await message.answer(text=success_text, reply_markup=kb.manual_mode)
+        else:
+            # Стандартный вариант (кнопка "Подобрать коляску")
+            await message.answer(text=success_text, reply_markup=kb.first_request)
+
 
 
 
@@ -459,23 +478,65 @@ async def handle_ai_message(message: Message, state: FSMContext, session: AsyncS
 # 4. ЛОВУШКА ДЛЯ ТЕКСТА БЕЗ РЕЖИМА
 # ==========================================
 @for_user_router.message(F.text)
-async def handle_no_state(message: Message, session: AsyncSession):
+async def handle_no_state(message: Message, bot:Bot, session: AsyncSession):
     """Если юзер пишет текст, но не выбрал кнопку -> показываем меню"""
     if await stop_if_no_promo(message=message, session=session):
         return
 
     result = await session.execute(select(User).where(User.telegram_id == message.from_user.id))
     user = result.scalar_one_or_none()
+    # 3. ЛОГИКА ПРОВЕРКИ
+    # Условие: is_first_request = False И show_intro_message = True
+    if user.show_intro_message:
+        # Меняем флаг на False, чтобы это сообщение больше не показывалось
+        user.show_intro_message = False
+        await session.commit()  # Сохраняем изменение в БД
 
-    await message.answer(
-        "👋 Чтобы я мог помочь, выберите, пожалуйста, режим работы:"
-        "\n\n<b>Подобрать коляску</b> - только для поиска (подбора) подходящей для Вас коляски"
-        "\n\n<b>Другой запрос</b> - для консультаций, решений вопросов по эксплуатации,анализ и сравнения уже известных "
-        "Вам моделей колясок"
-        "\n\n<blockquote>Количество запросов\n"
-        "на вашем балансе: [ {user.requests_left} ]</blockquote>",
-        reply_markup=kb.get_ai_mode_kb()
-    )
+        # Отправляем "Красивое" сообщение (copy_message)
+        try:
+            await bot.copy_message(
+                chat_id=message.chat.id,
+                from_chat_id=-1003498991864,  # ID группы
+                message_id=4,  # ID сообщения из группы
+            )
+            await asyncio.sleep(1)
+            await message.answer(
+                text="AI-консультант готов к работе!\n\n"
+                     "Он умеет подбирать коляски, а также отвечать на любые вопросы по эксплуатации\n\n"
+                     "👇 Выберите режим работы:"
+                     "\n\n<b>[Подобрать коляску]</b> - только для поиска (подбора) подходящей для Вас коляски"
+                     "\n\n<b>[Другой запрос]</b> - для консультаций, решений вопросов по эксплуатации,анализ и "
+                     "сравнения уже известных Вам моделей колясок",
+                reply_markup=get_ai_mode_kb()
+            )
+        except TelegramBadRequest:
+            # Получаем абсолютный путь к медиа-файлу
+            BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+            GIF_PATH = os.path.join(BASE_DIR, "..", "mediafile_for_bot", "video.mp4")
+            gif_file = FSInputFile(GIF_PATH)
+            # Отправляем медиа
+            wait_msg = await message.answer_video(
+                video=gif_file,
+                caption="AI-консультант готов к работе!\n\n"
+                        "Он умеет подбирать коляски, а также отвечать на любые вопросы по эксплуатации\n\n"
+                        "👇 Выберите режим работы:"
+                        "\n\n<b>[Подобрать коляску]</b> - только для поиска (подбора) подходящей для Вас коляски"
+                        "\n\n<b>[Другой запрос]</b> - для консультаций, решений вопросов по эксплуатации,анализ и "
+                        "сравнения уже известных Вам моделей колясок",
+                supports_streaming=True,
+                reply_markup=kb.get_ai_mode_kb()
+            )
+    else:
+        # ИНАЧЕ -> Отправляем обычное сообщение
+        await message.answer(
+            f"👋 Чтобы я мог помочь, выберите, пожалуйста, режим работы:"
+            f"\n\n<b>[Подобрать коляску]</b> - только для поиска (подбора) подходящей для Вас коляски"
+            f"\n\n<b>[Другой запрос]</b> - для консультаций, решений вопросов по эксплуатации,анализ и сравнения уже известных "
+            f"Вам моделей колясок"
+            f"\n\n<blockquote>Количество запросов\n"
+            f"на вашем балансе: [ {user.requests_left} ]</blockquote>",
+            reply_markup=kb.get_ai_mode_kb()
+        )
 
 
 
