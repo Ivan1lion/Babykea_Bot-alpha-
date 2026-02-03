@@ -14,16 +14,16 @@ client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 channel = int(os.getenv("CHANNEL_ID"))
 
 # Не давать доступ к МЕНЮ если не введен промо-код
-async def stop_if_no_promo(message: Message, session: AsyncSession, delete_delay: int = 1) -> bool:
+async def closed_menu(message: Message, session: AsyncSession, delete_delay: int = 1) -> bool:
     result = await session.execute(
-        select(User.promo_code).where(User.telegram_id == message.from_user.id)
+        select(User.closed_menu_flag).where(User.telegram_id == message.from_user.id)
     )
-    promo_code = result.scalar_one_or_none()
+    closed_menu_flag = result.scalar_one_or_none()
 
-    if promo_code:
+    if closed_menu_flag==False:
         return False  # НЕ останавливаем хэндлер
 
-    # promo_code пустой → останавливаем
+    # closed_menu_flag==True → останавливаем
     await message.delete()
     warn_message = await message.answer("Завершите действие⤴️")
     await asyncio.sleep(delete_delay)

@@ -61,6 +61,7 @@ class User(Base):
     stroller_model: Mapped[str] = mapped_column(String(50), nullable=True)
     stroller_condition: Mapped[str] = mapped_column(String(50), nullable=True)
     requests_left: Mapped[int] = mapped_column(Integer, default=1)
+    closed_menu_flag: Mapped[bool] = mapped_column(Boolean, default=True)
     is_first_request = Column(Boolean, default=True)
     show_intro_message: Mapped[bool] = mapped_column(Boolean, default=True)
     is_active: Mapped[bool] = mapped_column(default=True)

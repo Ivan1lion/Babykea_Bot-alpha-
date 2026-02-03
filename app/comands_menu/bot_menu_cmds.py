@@ -9,7 +9,7 @@ from aiogram import Router, Bot
 from aiogram.exceptions import TelegramBadRequest
 from app.comands_menu.text_for_user import text_offer
 from app.db.models import User, Magazine
-from app.db.crud import stop_if_no_promo
+from app.db.crud import closed_menu
 from app.handlers.keyboards import magazine_map_kb
 import app.handlers.keyboards as kb
 
@@ -35,9 +35,9 @@ bot_menu = [
 
 # команды для кнопки МЕНЮ
 @menu_cmds_router.message(Command("what"))
-async def policy_cmd(message: Message, session: AsyncSession):
+async def what_cmd(message: Message, session: AsyncSession):
 
-    if await stop_if_no_promo(message=message, session=session):
+    if await closed_menu(message=message, session=session):
         return
 
     await message.answer(f" 1. Карусель видеороликов о нюансах подбора детской коляски"
@@ -48,9 +48,9 @@ async def policy_cmd(message: Message, session: AsyncSession):
 
 
 @menu_cmds_router.message(Command("where"))
-async def policy_cmd(message: Message, session: AsyncSession):
+async def where_cmd(message: Message, session: AsyncSession):
 
-    if await stop_if_no_promo(message=message, session=session):
+    if await closed_menu(message=message, session=session):
         return
 
     await message.answer(f" 1. Карусель видеороликов о правилах правильной эксплуатации"
@@ -60,9 +60,9 @@ async def policy_cmd(message: Message, session: AsyncSession):
 
 
 @menu_cmds_router.message(Command("when"))
-async def policy_cmd(message: Message, session: AsyncSession):
+async def when_cmd(message: Message, session: AsyncSession):
 
-    if await stop_if_no_promo(message=message, session=session):
+    if await closed_menu(message=message, session=session):
         return
 
     await message.answer(f" 1. Карусель видеороликов о ТО детской коляски"
@@ -73,7 +73,7 @@ async def policy_cmd(message: Message, session: AsyncSession):
 
 @menu_cmds_router.message(Command("ai_consultant"))
 async def cmd_ai_consultant(message: Message, bot:Bot, session: AsyncSession):
-    if await stop_if_no_promo(message=message, session=session):
+    if await closed_menu(message=message, session=session):
         return
 
     result = await session.execute(select(User).where(User.telegram_id == message.from_user.id))
@@ -139,9 +139,9 @@ async def cmd_ai_consultant(message: Message, bot:Bot, session: AsyncSession):
 
 
 @menu_cmds_router.message(Command("blog"))
-async def policy_cmd(message: Message, bot: Bot, session: AsyncSession):
+async def blog_cmd(message: Message, bot: Bot, session: AsyncSession):
 
-    if await stop_if_no_promo(message=message, session=session):
+    if await closed_menu(message=message, session=session):
         return
 
     await bot.forward_message(
@@ -154,9 +154,9 @@ async def policy_cmd(message: Message, bot: Bot, session: AsyncSession):
 
 
 @menu_cmds_router.message(Command("help"))
-async def policy_cmd(message: Message, session: AsyncSession):
+async def help_cmd(message: Message, session: AsyncSession):
 
-    if await stop_if_no_promo(message=message, session=session):
+    if await closed_menu(message=message, session=session):
         return
 
     await message.answer(f" 1. Адрес магазина («Ваш магазин»)"
@@ -166,9 +166,9 @@ async def policy_cmd(message: Message, session: AsyncSession):
 
 
 @menu_cmds_router.message(Command("config"))
-async def policy_cmd(message: Message, session: AsyncSession):
+async def config_cmd(message: Message, session: AsyncSession):
 
-    if await stop_if_no_promo(message=message, session=session):
+    if await closed_menu(message=message, session=session):
         return
 
     await message.answer(f"1. /quiz_restart - пройти квиз-опрос заново"
@@ -184,9 +184,9 @@ async def policy_cmd(message: Message, session: AsyncSession):
 
 
 @menu_cmds_router.message(Command("contacts"))
-async def policy_cmd(message: Message, session: AsyncSession):
+async def contacts_cmd(message: Message, session: AsyncSession):
 
-    if await stop_if_no_promo(message=message, session=session):
+    if await closed_menu(message=message, session=session):
         return
 
     result = await session.execute(

@@ -24,7 +24,7 @@ from decimal import Decimal
 
 import app.handlers.keyboards as kb
 from app.handlers.keyboards import payment_button_keyboard
-from app.db.crud import get_or_create_user, stop_if_no_promo, create_pending_payment
+from app.db.crud import get_or_create_user, closed_menu, create_pending_payment
 from app.db.models import User, MagazineChannel, ChannelState, Magazine, Payment, UserQuizProfile
 from app.db.config import session_maker
 from app.posting.resolver import resolve_channel_context
@@ -153,6 +153,9 @@ async def process_promo_code(
         .limit(1)
     )
     branch = quiz_result.scalar_one_or_none()
+
+    if branch == 'service_only':
+        user.closed_menu_flag = False
 
     await session.commit()
     await state.clear()
@@ -302,8 +305,9 @@ async def process_first_auto_request(call: CallbackQuery, state: FSMContext, ses
         except Exception:
             await call.message.answer(answer, parse_mode=None, disable_web_page_preview=True)
 
-        # Списываем запрос
+        # Списываем запрос и снимаем флаг для достума к меню
         user.requests_left -= 1
+        user.closed_menu_flag = False
         await session.commit()
 
     except Exception as e:
@@ -345,7 +349,7 @@ async def process_mode_selection(callback: CallbackQuery, state: FSMContext):
 @for_user_router.message(F.text, AIChat.info_mode)
 async def handle_ai_message(message: Message, state: FSMContext, session: AsyncSession, bot: Bot):
     # Проверки (промокод, баланс...)
-    if await stop_if_no_promo(message=message, session=session): return
+    if await closed_menu(message=message, session=session): return
 
     result = await session.execute(select(User).where(User.telegram_id == message.from_user.id))
     user = result.scalar_one_or_none()
@@ -478,7 +482,7 @@ async def handle_ai_message(message: Message, state: FSMContext, session: AsyncS
 @for_user_router.message(F.text)
 async def handle_no_state(message: Message, bot:Bot, session: AsyncSession):
     """Если юзер пишет текст, но не выбрал кнопку -> показываем меню"""
-    if await stop_if_no_promo(message=message, session=session):
+    if await closed_menu(message=message, session=session):
         return
 
     result = await session.execute(select(User).where(User.telegram_id == message.from_user.id))
