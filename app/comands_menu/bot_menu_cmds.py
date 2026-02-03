@@ -129,7 +129,7 @@ async def cmd_ai_consultant(message: Message, bot:Bot, session: AsyncSession):
             f"Вам моделей колясок"
             f"\n\n<blockquote>Количество запросов\n"
             f"на вашем балансе: [ {user.requests_left} ]</blockquote>",
-            reply_markup=kb.get_ai_mode_kb()
+            reply_markup=kb.get_ai_mode_with_balance_kb()
         )
 
 

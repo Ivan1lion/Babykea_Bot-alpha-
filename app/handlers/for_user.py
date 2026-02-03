@@ -135,43 +135,41 @@ async def process_promo_code(
                                           "продолжить без лишних нервов</blockquote>")
         return
 
-        # 1. Обновляем пользователя (привязываем магазин)
-        result = await session.execute(
-            select(User).where(User.telegram_id == message.from_user.id)
-        )
-        user = result.scalar_one()
+    # 1. Обновляем пользователя (привязываем магазин)
+    result = await session.execute(
+        select(User).where(User.telegram_id == message.from_user.id)
+    )
+    user = result.scalar_one()
 
-        user.promo_code = promo_code
-        user.magazine_id = magazine.id
+    user.promo_code = promo_code
+    user.magazine_id = magazine.id
 
-        # 2. Узнаем branch пользователя (чтобы понять, какую кнопку дать)
-        # Берем последний заполненный квиз
-        quiz_result = await session.execute(
-            select(UserQuizProfile.branch)
-            .where(UserQuizProfile.user_id == user.id)
-            .order_by(UserQuizProfile.id.desc())
-            .limit(1)
-        )
-        branch = quiz_result.scalar_one_or_none()
+    # 2. Узнаем branch пользователя (чтобы понять, какую кнопку дать)
+    # Берем последний заполненный квиз
+    quiz_result = await session.execute(
+        select(UserQuizProfile.branch)
+        .where(UserQuizProfile.user_id == user.id)
+        .order_by(UserQuizProfile.id.desc())
+        .limit(1)
+    )
+    branch = quiz_result.scalar_one_or_none()
 
-        await session.commit()
-        await state.clear()
+    await session.commit()
+    await state.clear()
 
-        # Текст сообщения одинаковый, меняется только клавиатура
-        success_text = (
-            f'✅ Проведена успешная активация по промокоду магазина детских колясок "{magazine.name}"\n\n'
-            f'Контакты продавца будут находиться в меню в разделе\n'
-            f'"📍 Магазин колясок"'
-        )
+    # Текст сообщения одинаковый, меняется только клавиатура
+    success_text = (
+        f'✅ Проведена успешная активация по промокоду магазина детских колясок "{magazine.name}"\n\n'
+        f'Контакты продавца будут находиться в меню в разделе\n'
+        f'"📍 Магазин колясок"'
+    )
 
-        # 4. Проверка условия branch
-        if branch == 'service_only':
-            # ⚠️ ВНИМАНИЕ: Замени kb.manual_mode на название твоей клавиатуры "как не сломать"
-            # Если такой переменной нет в kb, создай её или используй существующую
-            await message.answer(text=success_text, reply_markup=kb.manual_mode)
-        else:
-            # Стандартный вариант (кнопка "Подобрать коляску")
-            await message.answer(text=success_text, reply_markup=kb.first_request)
+    # 4. Проверка условия branch
+    if branch == 'service_only':
+        await message.answer(text=success_text, reply_markup=kb.manual_mode)
+    else:
+        # Стандартный вариант (кнопка "Подобрать коляску")
+        await message.answer(text=success_text, reply_markup=kb.first_request)
 
 
 
@@ -535,8 +533,24 @@ async def handle_no_state(message: Message, bot:Bot, session: AsyncSession):
             f"Вам моделей колясок"
             f"\n\n<blockquote>Количество запросов\n"
             f"на вашем балансе: [ {user.requests_left} ]</blockquote>",
-            reply_markup=kb.get_ai_mode_kb()
+            reply_markup=kb.get_ai_mode_with_balance_kb()
         )
+
+
+# Обработчик нажатия на кнопку "💳 Пополнить баланс ➕"
+@for_user_router.callback_query(F.data == "top_up_balance")
+async def process_top_up_balance_click(call: CallbackQuery):
+    # Обязательно отвечаем на callback, чтобы убрать часики загрузки
+    await call.answer()
+
+    # Отправляем сообщение с оплатой
+    await message.answer(
+        f"💡 Чтобы я мог выдать точный результат и завершить персональный анализ под ваши условия, выберите "
+        f"пакет запросов ниже"
+        f"\n\n<a href='https://telegra.ph/AI-konsultant-rabotaet-na-platnoj-platforme-httpsplatformopenaicom-01-16'>"
+        "(Как это работает и что считается запросом?)</a>",
+        reply_markup=kb.pay
+    )
 
 
 

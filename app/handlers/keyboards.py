@@ -25,7 +25,7 @@ first_request = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text
 
                                                                          callback_data="first_request")]])
 #Кнопка после активации бота, если пользователь branch == 'service_only'
-manual_mode = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="Как не сломать коляску 🤔",
+manual_mode = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="💢 Как не сломать коляску",
                                                                          callback_data="manual_mode")]])
 
 
@@ -36,6 +36,17 @@ def get_ai_mode_kb():
     kb.button(text="🎯 Подобрать коляску", callback_data="mode_catalog")
     kb.button(text="❓ Другой запрос", callback_data="mode_info")
     kb.adjust(1) # Кнопки одна под другой
+    return kb.as_markup()
+
+
+
+def get_ai_mode_with_balance_kb():
+    kb = InlineKeyboardBuilder()
+    kb.button(text="🎯 Подобрать коляску", callback_data="mode_catalog")
+    kb.button(text="❓ Другой запрос", callback_data="mode_info")
+    # 👇 Новая кнопка
+    kb.button(text="💳 Пополнить баланс ➕", callback_data="top_up_balance")
+    kb.adjust(1)
     return kb.as_markup()
 
 
