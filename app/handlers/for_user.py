@@ -310,10 +310,10 @@ async def process_first_auto_request(call: CallbackQuery, state: FSMContext, ses
         )
 
         # --- ФУТЕР (Маркетинг) ---
-        if user.is_first_request:
-            marketing_footer = get_marketing_footer(user_branch)
+        if user.first_catalog_request:
+            marketing_footer = get_marketing_footer("catalog_mode")
             answer += marketing_footer
-            user.is_first_request = False
+            user.first_catalog_request = False  # Сжигаем только его
 
         # --- ОТПРАВКА ---
         await typing_msg.delete()
@@ -476,11 +476,23 @@ async def handle_ai_message(message: Message, state: FSMContext, session: AsyncS
             system_instruction=system_prompt
         )
 
-        # --- ФУТЕР (ТОЛЬКО ПЕРВЫЙ РАЗ) ---
-        if user.is_first_request:
-            marketing_footer = get_marketing_footer(user_branch)
+        # --- 🔥 НОВАЯ ЛОГИКА ФУТЕРОВ (ДВА ФЛАГА) ---
+        marketing_footer = ""
+
+        if is_catalog_mode:
+            # Если режим Каталога И это первый запрос в каталог
+            if user.first_catalog_request:
+                marketing_footer = get_marketing_footer("catalog_mode")
+                user.first_catalog_request = False  # Сжигаем флаг каталога
+        else:
+            # Если режим Инфо И это первый запрос эксперту
+            if user.first_info_request:
+                marketing_footer = get_marketing_footer("info_mode")
+                user.first_info_request = False  # Сжигаем флаг инфо
+
+        # Добавляем футер, если он сгенерировался
+        if marketing_footer:
             answer += marketing_footer
-            user.is_first_request = False
 
         # --- ОТПРАВКА ---
         try:
