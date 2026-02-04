@@ -110,10 +110,14 @@ def get_system_prompt(mode: str, quiz_data: str, shop_url: str = None, products_
     )
 
 
-def get_marketing_footer(branch: str) -> str:
-    """Выбираем футер по ветке пользователя"""
-    if branch == 'service_only':
+def get_marketing_footer(mode: str) -> str:
+    """
+    Выбираем футер по РЕЖИМУ работы:
+    - catalog_mode -> Футер для покупателя (BUYER)
+    - info_mode    -> Футер для владельца/ремонт (OWNER)
+    """
+    if mode == 'info_mode':
         return PromptConfig.OWNER_MARKETING_FOOTER
 
-    # Для pregnant И stroller_6_plus - общий текст
+    # Для catalog_mode (Подобрать коляску) - футер покупателя
     return PromptConfig.BUYER_MARKETING_FOOTER
