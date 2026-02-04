@@ -135,8 +135,8 @@ async def process_feed_group(session: aiohttp.ClientSession, feed_url: str, maga
     mag_names = [m.name for m in magazines]
     # Сохраняем ID как строки (Chroma лучше работает со строками в метаданных)
     mag_ids = [str(m.id) for m in magazines]
-    # Превращаем список ID в строку "1,2,5", чтобы избежать проблем с хранением списков в старых версиях
-    # Но Chroma 0.4+ умеет хранить списки. Оставим пока так, но добавим поле для точного поиска.
+
+    # Превращаем список ID в строку "1,2,5"
     mag_ids_str = ",".join(mag_ids)
 
     logger.info(f"🔄 Обработка группы магазинов: {mag_names}")
@@ -158,7 +158,6 @@ async def process_feed_group(session: aiohttp.ClientSession, feed_url: str, maga
         if not embeddings: continue
 
         # === 🔥 ИЗМЕНЕНИЯ ПОД CHROMADB ===
-        # Chroma принимает списки колонок, а не список словарей
         ids_batch = []
         embeddings_batch = []
         metadatas_batch = []
@@ -170,10 +169,12 @@ async def process_feed_group(session: aiohttp.ClientSession, feed_url: str, maga
             vector_id = f"feed_{url_hash}_{product['id']}"
 
             meta = product["metadata"]
-            # Добавляем ID магазинов в метаданные.
-            # Храним как строку для надежности отображения, но Chroma поймет и так.
-            # Важно: Чтобы фильтровать, нам нужно будет искать вхождение.
-            # Для простоты сохраним mag_ids_str, а фильтровать будем в Python-коде после поиска (самый надежный вариант)
+
+            # 🔥 ВАЖНОЕ ДОБАВЛЕНИЕ: Сохраняем ссылку-источник
+            # Это нужно для manage_chroma.py, чтобы удалять фиды целиком
+            meta["source_url"] = feed_url
+
+            # Добавляем ID магазинов (для фильтрации "свой-чужой")
             meta["magazine_ids_str"] = mag_ids_str
 
             ids_batch.append(vector_id)
@@ -194,6 +195,70 @@ async def process_feed_group(session: aiohttp.ClientSession, feed_url: str, maga
             logger.error(f"Ошибка ChromaDB Upsert: {e}")
 
     logger.info(f"🎉 Группа {mag_names} полностью обновлена!")
+
+# async def process_feed_group(session: aiohttp.ClientSession, feed_url: str, magazines: List[Magazine]):
+#     mag_names = [m.name for m in magazines]
+#     # Сохраняем ID как строки (Chroma лучше работает со строками в метаданных)
+#     mag_ids = [str(m.id) for m in magazines]
+#     # Превращаем список ID в строку "1,2,5", чтобы избежать проблем с хранением списков в старых версиях
+#     # Но Chroma 0.4+ умеет хранить списки. Оставим пока так, но добавим поле для точного поиска.
+#     mag_ids_str = ",".join(mag_ids)
+#
+#     logger.info(f"🔄 Обработка группы магазинов: {mag_names}")
+#
+#     xml_content = await download_feed(session, feed_url)
+#     if not xml_content: return
+#
+#     products = parse_offers_from_xml(xml_content)
+#     logger.info(f"📦 В фиде найдено товаров: {len(products)}")
+#
+#     if not products: return
+#
+#     batch_size = 100
+#     for i in range(0, len(products), batch_size):
+#         batch = products[i: i + batch_size]
+#         texts_to_embed = [p["text"] for p in batch]
+#         embeddings = await get_embeddings_batch(texts_to_embed)
+#
+#         if not embeddings: continue
+#
+#         # === 🔥 ИЗМЕНЕНИЯ ПОД CHROMADB ===
+#         # Chroma принимает списки колонок, а не список словарей
+#         ids_batch = []
+#         embeddings_batch = []
+#         metadatas_batch = []
+#         documents_batch = []
+#
+#         url_hash = hashlib.md5(feed_url.encode()).hexdigest()[:10]
+#
+#         for j, product in enumerate(batch):
+#             vector_id = f"feed_{url_hash}_{product['id']}"
+#
+#             meta = product["metadata"]
+#             # Добавляем ID магазинов в метаданные.
+#             # Храним как строку для надежности отображения, но Chroma поймет и так.
+#             # Важно: Чтобы фильтровать, нам нужно будет искать вхождение.
+#             # Для простоты сохраним mag_ids_str, а фильтровать будем в Python-коде после поиска (самый надежный вариант)
+#             meta["magazine_ids_str"] = mag_ids_str
+#
+#             ids_batch.append(vector_id)
+#             embeddings_batch.append(embeddings[j])
+#             metadatas_batch.append(meta)
+#             documents_batch.append(product["text"])
+#
+#         try:
+#             # Upsert в Chroma
+#             collection.upsert(
+#                 ids=ids_batch,
+#                 embeddings=embeddings_batch,
+#                 metadatas=metadatas_batch,
+#                 documents=documents_batch
+#             )
+#             logger.info(f"✅ Группа {mag_names}: загружено {len(ids_batch)} товаров...")
+#         except Exception as e:
+#             logger.error(f"Ошибка ChromaDB Upsert: {e}")
+#
+#     logger.info(f"🎉 Группа {mag_names} полностью обновлена!")
 
 
 async def run_update_cycle():

@@ -52,6 +52,11 @@ class AIChat(StatesGroup):
     info_mode = State()     # Режим вопросов (работает Google Search / Общие знания)
 
 
+# ID магазинов, по которым ищем для ПЛАТНЫХ пользователей
+# 🔥🔥🔥🔥🔥🔥🔥🔥(Замени цифры на реальные ID твоих 5 крупных магазинов в БД)🔥🔥🔥🔥🔥🔥🔥🔥
+TOP_SHOPS_IDS = [1, 2, 5, 8, 12]
+
+
 # команд СТАРТ
 @for_user_router.message(CommandStart())
 async def cmd_start(message: Message, bot: Bot, session: AsyncSession):
@@ -203,7 +208,7 @@ async def process_first_auto_request(call: CallbackQuery, state: FSMContext, ses
 
     # Проверка лимитов
     if user.requests_left <= 0:
-        await message.answer(
+        await call.message.answer(  # Исправил message.answer на call.message.answer
             f"💡 Чтобы я мог выдать точный результат и завершить персональный анализ под ваши условия, выберите "
             f"пакет запросов ниже"
             f"\n\n<a href='https://telegra.ph/AI-konsultant-rabotaet-na-platnoj-platforme-httpsplatformopenaicom-01-16'>"
@@ -213,7 +218,6 @@ async def process_first_auto_request(call: CallbackQuery, state: FSMContext, ses
         return
 
     # 4. Визуальная индикация работы
-    # Можно отправить стикер или текст
     typing_msg = await call.message.answer("🔍 Анализирую ваши ответы из квиза и ищу лучшее решение...")
 
     # Запускаем "печатание"
@@ -221,7 +225,7 @@ async def process_first_auto_request(call: CallbackQuery, state: FSMContext, ses
     typing_task = asyncio.create_task(send_typing(bot, call.message.chat.id, stop_event))
 
     try:
-        # --- СБОР ДАННЫХ (Копия логики из main handler) ---
+        # --- СБОР ДАННЫХ ---
         mag_result = await session.execute(select(Magazine).where(Magazine.id == user.magazine_id))
         current_magazine = mag_result.scalar_one_or_none()
 
@@ -249,40 +253,55 @@ async def process_first_auto_request(call: CallbackQuery, state: FSMContext, ses
             except:
                 pass
 
-        # --- ПОИСК В БАЗЕ ---
-        # Ключевой момент: user_query="" (пустая строка)
-        # Search Service склеит: "" + "перевод_квиза"
-        # И поиск пойдет ТОЛЬКО по характеристикам из квиза.
-
+        # --- ПОИСК В БАЗЕ (ОБНОВЛЕННАЯ ЛОГИКА) ---
         products_context = ""
         final_shop_url = None
 
         if current_magazine:
             feed_url = current_magazine.feed_url
-            if feed_url == "Google_Search":
-                final_shop_url = current_magazine.url_website
-            elif feed_url:
-                # Поиск в ChromaDB по ID магазина
+
+            # Условие 1: Если есть конкретная ссылка на YML (Обычный магазин)
+            if feed_url and "http" in feed_url:
                 products_context = await search_products(
-                    user_query="",  # <--- ПУСТОЙ ЗАПРОС
+                    user_query="",  # <--- ПУСТОЙ ЗАПРОС (только квиз)
                     quiz_json=quiz_json_obj,
-                    magazine_id=current_magazine.id,
+                    allowed_magazine_ids=current_magazine.id,  # Ищем только у него
                     top_k=10
                 )
+
+            # Условие 3: Если это "Технический магазин" для платных (поиск по ТОП-5)
+            # В базе у такого магазина в feed_url должно быть написано "PREMIUM_AGGREGATOR"
+            elif feed_url == "PREMIUM_AGGREGATOR":
+                products_context = await search_products(
+                    user_query="",
+                    quiz_json=quiz_json_obj,
+                    allowed_magazine_ids=TOP_SHOPS_IDS,  # 🔥 Ищем по списку ТОП-5
+                    top_k=10
+                )
+
+            # Условие 2: Если feed_url пустой (или "Google_Search") -> Векторный поиск отключен
             else:
-                products_context = await search_products("", quiz_json_obj, None)
+                final_shop_url = current_magazine.url_website
+                # print для логов, чтобы видеть, что сработала ветка Гугла
+                print(f"⚠️ У магазина '{current_magazine.name}' нет YML. Используем поиск по сайту: {final_shop_url}")
+
         else:
-            products_context = await search_products("", quiz_json_obj, None)
+            # Fallback: Если магазин вообще не привязан -> Ищем по ТОП-5
+            products_context = await search_products(
+                user_query="",
+                quiz_json=quiz_json_obj,
+                allowed_magazine_ids=TOP_SHOPS_IDS,
+                top_k=10
+            )
 
         # --- ГЕНЕРАЦИЯ ОТВЕТА ---
         system_prompt = get_system_prompt(
             mode="catalog_mode",
             quiz_data=quiz_data_str,
-            shop_url=final_shop_url,
+            shop_url=final_shop_url,  # Если заполнился (Условие 2), AI будет знать, куда идти
             products_context=products_context
         )
 
-        # Сюда можно передать вводную фразу, чтобы AI понимал контекст
         fake_user_message = "Подбери мне подходящую коляску"
 
         answer = await ask_responses_api(
@@ -297,7 +316,6 @@ async def process_first_auto_request(call: CallbackQuery, state: FSMContext, ses
             user.is_first_request = False
 
         # --- ОТПРАВКА ---
-        # Удаляем сообщение "Анализирую..."
         await typing_msg.delete()
 
         try:
@@ -305,7 +323,7 @@ async def process_first_auto_request(call: CallbackQuery, state: FSMContext, ses
         except Exception:
             await call.message.answer(answer, parse_mode=None, disable_web_page_preview=True)
 
-        # Списываем запрос и снимаем флаг для достума к меню
+        # Списываем запрос и снимаем флаг для доступа к меню
         user.requests_left -= 1
         user.closed_menu_flag = False
         await session.commit()
@@ -318,8 +336,133 @@ async def process_first_auto_request(call: CallbackQuery, state: FSMContext, ses
         typing_task.cancel()
         await state.clear()
 
-
-
+# @for_user_router.callback_query(F.data == "first_request")
+# async def process_first_auto_request(call: CallbackQuery, state: FSMContext, session: AsyncSession, bot: Bot):
+#     await call.answer()
+#     # 2. Переключаем режим сразу на "Каталог"
+#     await state.set_state(AIChat.catalog_mode)
+#
+#     # 3. Получаем юзера
+#     result = await session.execute(select(User).where(User.telegram_id == call.from_user.id))
+#     user = result.scalar_one_or_none()
+#     if not user: return
+#
+#     # Проверка лимитов
+#     if user.requests_left <= 0:
+#         await message.answer(
+#             f"💡 Чтобы я мог выдать точный результат и завершить персональный анализ под ваши условия, выберите "
+#             f"пакет запросов ниже"
+#             f"\n\n<a href='https://telegra.ph/AI-konsultant-rabotaet-na-platnoj-platforme-httpsplatformopenaicom-01-16'>"
+#             "(Как это работает и что считается запросом?)</a>",
+#             reply_markup=kb.pay
+#         )
+#         return
+#
+#     # 4. Визуальная индикация работы
+#     # Можно отправить стикер или текст
+#     typing_msg = await call.message.answer("🔍 Анализирую ваши ответы из квиза и ищу лучшее решение...")
+#
+#     # Запускаем "печатание"
+#     stop_event = asyncio.Event()
+#     typing_task = asyncio.create_task(send_typing(bot, call.message.chat.id, stop_event))
+#
+#     try:
+#         # --- СБОР ДАННЫХ (Копия логики из main handler) ---
+#         mag_result = await session.execute(select(Magazine).where(Magazine.id == user.magazine_id))
+#         current_magazine = mag_result.scalar_one_or_none()
+#
+#         # Достаем ответы на квиз
+#         quiz_data_str = "Нет данных."
+#         quiz_json_obj = {}
+#         user_branch = "pregnant"
+#
+#         quiz_result = await session.execute(
+#             select(UserQuizProfile).where(UserQuizProfile.user_id == user.id).order_by(UserQuizProfile.id.desc()).limit(
+#                 1)
+#         )
+#         quiz_profile = quiz_result.scalar_one_or_none()
+#
+#         if quiz_profile:
+#             if quiz_profile.branch:
+#                 user_branch = quiz_profile.branch
+#             try:
+#                 if isinstance(quiz_profile.data, str):
+#                     quiz_json_obj = json.loads(quiz_profile.data)
+#                     quiz_data_str = quiz_profile.data
+#                 else:
+#                     quiz_json_obj = quiz_profile.data
+#                     quiz_data_str = json.dumps(quiz_profile.data, ensure_ascii=False)
+#             except:
+#                 pass
+#
+#         # --- ПОИСК В БАЗЕ ---
+#         # Ключевой момент: user_query="" (пустая строка)
+#         # Search Service склеит: "" + "перевод_квиза"
+#         # И поиск пойдет ТОЛЬКО по характеристикам из квиза.
+#
+#         products_context = ""
+#         final_shop_url = None
+#
+#         if current_magazine:
+#             feed_url = current_magazine.feed_url
+#             if feed_url == "Google_Search":
+#                 final_shop_url = current_magazine.url_website
+#             elif feed_url:
+#                 # Поиск в ChromaDB по ID магазина
+#                 products_context = await search_products(
+#                     user_query="",  # <--- ПУСТОЙ ЗАПРОС
+#                     quiz_json=quiz_json_obj,
+#                     magazine_id=current_magazine.id,
+#                     top_k=10
+#                 )
+#             else:
+#                 products_context = await search_products("", quiz_json_obj, None)
+#         else:
+#             products_context = await search_products("", quiz_json_obj, None)
+#
+#         # --- ГЕНЕРАЦИЯ ОТВЕТА ---
+#         system_prompt = get_system_prompt(
+#             mode="catalog_mode",
+#             quiz_data=quiz_data_str,
+#             shop_url=final_shop_url,
+#             products_context=products_context
+#         )
+#
+#         # Сюда можно передать вводную фразу, чтобы AI понимал контекст
+#         fake_user_message = "Подбери мне подходящую коляску"
+#
+#         answer = await ask_responses_api(
+#             user_message=fake_user_message,
+#             system_instruction=system_prompt
+#         )
+#
+#         # --- ФУТЕР (Маркетинг) ---
+#         if user.is_first_request:
+#             marketing_footer = get_marketing_footer(user_branch)
+#             answer += marketing_footer
+#             user.is_first_request = False
+#
+#         # --- ОТПРАВКА ---
+#         # Удаляем сообщение "Анализирую..."
+#         await typing_msg.delete()
+#
+#         try:
+#             await call.message.answer(answer, parse_mode=ParseMode.HTML, disable_web_page_preview=True)
+#         except Exception:
+#             await call.message.answer(answer, parse_mode=None, disable_web_page_preview=True)
+#
+#         # Списываем запрос и снимаем флаг для достума к меню
+#         user.requests_left -= 1
+#         user.closed_menu_flag = False
+#         await session.commit()
+#
+#     except Exception as e:
+#         logger.error(f"Error in auto-request: {e}", exc_info=True)
+#         await call.message.answer("⚠️ Произошла ошибка на сервере. Нажмите кнопку еще раз.")
+#     finally:
+#         stop_event.set()
+#         typing_task.cancel()
+#         await state.clear()
 
 
 # ==========================================
@@ -331,8 +474,9 @@ async def process_mode_selection(callback: CallbackQuery, state: FSMContext):
 
     if mode == "mode_catalog":
         await state.set_state(AIChat.catalog_mode)
-        text = ("👶 **Режим: Подбор коляски**\n\nОпишите, какую коляску вы ищете (например: *'Легкая для самолета'* или "
-                "*'Вездеход для зимы'*).")
+        text = (
+            "👶 **Режим: Подбор коляски**\n\nОпишите, какую коляску вы ищете (например: *'Легкая для самолета'* или "
+            "*'Вездеход для зимы'*).")
     else:
         await state.set_state(AIChat.info_mode)
         text = ("❓ **Режим: Вопрос эксперту**\n\nЗадайте любой вопрос (например: *'Что лучше: Anex или Tutis?'* или "
@@ -406,25 +550,40 @@ async def handle_ai_message(message: Message, state: FSMContext, session: AsyncS
         final_shop_url = None
 
         if is_catalog_mode:
-            # Тут работает ChromaDB или Site Search
+            # Тут работает ChromaDB или Site Search (ОБНОВЛЕННАЯ ЛОГИКА)
             if current_magazine:
                 feed_url = current_magazine.feed_url
 
-                if feed_url == "Google_Search":
-                    final_shop_url = current_magazine.url_website
-                elif feed_url:
-                    # Поиск в базе по ID магазина
+                # Условие 1: Конкретный YML
+                if feed_url and "http" in feed_url:
+                    products_context = await search_products(
+                        user_query=message.text,  # Тут передаем текст пользователя
+                        quiz_json=quiz_json_obj,
+                        allowed_magazine_ids=current_magazine.id,
+                        top_k=10
+                    )
+
+                # Условие 3: Премиум агрегатор (ТОП-5)
+                elif feed_url == "PREMIUM_AGGREGATOR":
                     products_context = await search_products(
                         user_query=message.text,
                         quiz_json=quiz_json_obj,
-                        magazine_id=current_magazine.id,
+                        allowed_magazine_ids=TOP_SHOPS_IDS,  # Поиск по списку топ магазинов
                         top_k=10
                     )
+
+                # Условие 2: Пусто или Google_Search -> Идем на сайт
                 else:
-                    # Поиск в базе везде (если нет фида у магазина, но режим подбора)
-                    products_context = await search_products(message.text, quiz_json_obj, None)
+                    final_shop_url = current_magazine.url_website
+
             else:
-                products_context = await search_products(message.text, quiz_json_obj, None)
+                # Fallback: Если магазина нет вообще -> Ищем по ТОП-5
+                products_context = await search_products(
+                    user_query=message.text,
+                    quiz_json=quiz_json_obj,
+                    allowed_magazine_ids=TOP_SHOPS_IDS,
+                    top_k=10
+                )
 
         # Если режим INFO - мы просто пропускаем блок выше, products_context остается пустым,
         # и get_system_prompt выдаст шаблон эксперта.
@@ -474,6 +633,164 @@ async def handle_ai_message(message: Message, state: FSMContext, session: AsyncS
             await typing_msg.delete()
         except:
             pass
+
+
+
+
+
+#
+# # ==========================================
+# # 1. ОБРАБОТКА КНОПОК (ВЫБОР РЕЖИМА)
+# # ==========================================
+# @for_user_router.callback_query(F.data.in_({"mode_catalog", "mode_info"}))
+# async def process_mode_selection(callback: CallbackQuery, state: FSMContext):
+#     mode = callback.data
+#
+#     if mode == "mode_catalog":
+#         await state.set_state(AIChat.catalog_mode)
+#         text = ("👶 **Режим: Подбор коляски**\n\nОпишите, какую коляску вы ищете (например: *'Легкая для самолета'* или "
+#                 "*'Вездеход для зимы'*).")
+#     else:
+#         await state.set_state(AIChat.info_mode)
+#         text = ("❓ **Режим: Вопрос эксперту**\n\nЗадайте любой вопрос (например: *'Что лучше: Anex или Tutis?'* или "
+#                 "*'Как смазать колеса?'*).")
+#
+#     await callback.message.edit_text(text)
+#     await callback.answer()
+#
+#
+# # ==========================================
+# # 2. ОБРАБОТКА ТЕКСТА (С УЧЕТОМ РЕЖИМА)
+# # ==========================================
+# @for_user_router.message(F.text, AIChat.catalog_mode)
+# @for_user_router.message(F.text, AIChat.info_mode)
+# async def handle_ai_message(message: Message, state: FSMContext, session: AsyncSession, bot: Bot):
+#     # Проверки (промокод, баланс...)
+#     if await closed_menu(message=message, session=session): return
+#
+#     result = await session.execute(select(User).where(User.telegram_id == message.from_user.id))
+#     user = result.scalar_one_or_none()
+#     if not user: return
+#
+#     if user.requests_left <= 0:
+#         await message.answer(
+#             f"💡 Чтобы я мог выдать точный результат и завершить персональный анализ под ваши условия, выберите "
+#             f"пакет запросов ниже"
+#             f"\n\n<a href='https://telegra.ph/AI-konsultant-rabotaet-na-platnoj-platforme-httpsplatformopenaicom-01-16'>"
+#             "(Как это работает и что считается запросом?)</a>",
+#             reply_markup=kb.pay
+#         )
+#         return
+#
+#     # Получаем текущий режим (state)
+#     current_state = await state.get_state()
+#     is_catalog_mode = (current_state == AIChat.catalog_mode.state)
+#
+#     stop_event = asyncio.Event()
+#     typing_task = asyncio.create_task(send_typing(bot, message.chat.id, stop_event))
+#     typing_msg = await message.answer("🤔 Думаю..." if not is_catalog_mode else "🔍 Ищу варианты...")
+#
+#     try:
+#         # --- СБОР ДАННЫХ ---
+#         mag_result = await session.execute(select(Magazine).where(Magazine.id == user.magazine_id))
+#         current_magazine = mag_result.scalar_one_or_none()
+#
+#         quiz_data_str = "Нет данных."
+#         quiz_json_obj = {}
+#         user_branch = "pregnant"  # Дефолт
+#
+#         quiz_result = await session.execute(
+#             select(UserQuizProfile).where(UserQuizProfile.user_id == user.id).order_by(UserQuizProfile.id.desc()).limit(
+#                 1)
+#         )
+#         quiz_profile = quiz_result.scalar_one_or_none()
+#
+#         if quiz_profile:
+#             if quiz_profile.branch:
+#                 user_branch = quiz_profile.branch
+#             try:
+#                 if isinstance(quiz_profile.data, str):
+#                     quiz_json_obj = json.loads(quiz_profile.data)
+#                     quiz_data_str = quiz_profile.data
+#                 else:
+#                     quiz_json_obj = quiz_profile.data
+#                     quiz_data_str = json.dumps(quiz_profile.data, ensure_ascii=False)
+#             except:
+#                 pass
+#
+#         # --- ЛОГИКА ПОИСКА (ТОЛЬКО ДЛЯ CATALOG MODE) ---
+#         products_context = ""
+#         final_shop_url = None
+#
+#         if is_catalog_mode:
+#             # Тут работает ChromaDB или Site Search
+#             if current_magazine:
+#                 feed_url = current_magazine.feed_url
+#
+#                 if feed_url == "Google_Search":
+#                     final_shop_url = current_magazine.url_website
+#                 elif feed_url:
+#                     # Поиск в базе по ID магазина
+#                     products_context = await search_products(
+#                         user_query=message.text,
+#                         quiz_json=quiz_json_obj,
+#                         magazine_id=current_magazine.id,
+#                         top_k=10
+#                     )
+#                 else:
+#                     # Поиск в базе везде (если нет фида у магазина, но режим подбора)
+#                     products_context = await search_products(message.text, quiz_json_obj, None)
+#             else:
+#                 products_context = await search_products(message.text, quiz_json_obj, None)
+#
+#         # Если режим INFO - мы просто пропускаем блок выше, products_context остается пустым,
+#         # и get_system_prompt выдаст шаблон эксперта.
+#
+#         # --- ГЕНЕРАЦИЯ ---
+#         mode_key = "catalog_mode" if is_catalog_mode else "info_mode"
+#
+#         system_prompt = get_system_prompt(
+#             mode=mode_key,
+#             quiz_data=quiz_data_str,
+#             shop_url=final_shop_url,
+#             products_context=products_context
+#         )
+#
+#         answer = await ask_responses_api(
+#             user_message=message.text,
+#             system_instruction=system_prompt
+#         )
+#
+#         # --- ФУТЕР (ТОЛЬКО ПЕРВЫЙ РАЗ) ---
+#         if user.is_first_request:
+#             marketing_footer = get_marketing_footer(user_branch)
+#             answer += marketing_footer
+#             user.is_first_request = False
+#
+#         # --- ОТПРАВКА ---
+#         try:
+#             # 🔥 ВАЖНО: Используем HTML
+#             await message.answer(answer, parse_mode=ParseMode.HTML, disable_web_page_preview=True)
+#         except TelegramBadRequest as e:
+#             # Если даже HTML сломался (очень редко), логируем и шлем текст
+#             logger.error(f"HTML Parse Error: {e}")
+#             await message.answer(answer, parse_mode=None, disable_web_page_preview=True)
+#
+#         user.requests_left -= 1
+#         await session.commit()
+#
+#     except Exception as e:
+#         logger.error(f"Error: {e}", exc_info=True)
+#         await message.answer("⚠️ Произошла ошибка. Попробуйте позже.")
+#     finally:
+#         stop_event.set()
+#         typing_task.cancel()
+#         with contextlib.suppress(asyncio.CancelledError):
+#             await typing_task
+#         try:
+#             await typing_msg.delete()
+#         except:
+#             pass
 
 
 # ==========================================
