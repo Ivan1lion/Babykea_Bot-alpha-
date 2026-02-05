@@ -13,7 +13,7 @@ from aiohttp import web
 from dotenv import find_dotenv, load_dotenv
 load_dotenv(find_dotenv())
 
-from app.db.config import create_db, drop_db, session_maker
+from app.db.config import session_maker
 from app.middlewares.db_session import DataBaseSession
 from app.handlers.for_user import for_user_router
 from app.handlers.for_quiz import quiz_router
