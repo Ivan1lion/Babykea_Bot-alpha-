@@ -1,0 +1,69 @@
+version: '3.8'
+
+services:
+  # 1. Твой Бот
+#  bot:
+#    build: .
+#    container_name: babykea_bot
+#    restart: always
+#    ports:
+#      - "8000:8000"
+#    # Команда запуска: сперва накатываем миграции, потом запускаем бота
+#    command: sh -c "alembic upgrade head && python -m app.main"
+#    env_file:
+#      - .env
+#    environment:
+#      # Внутри докера хосты называются именами сервисов
+#      - DB_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+#      - REDIS_HOST=redis
+#      - REDIS_PORT=6379
+#    volumes:
+#      # Пробрасываем медиа, чтобы бот мог сохранять/читать файлы
+#      - ./app/mediafile_for_bot:/app/app/mediafile_for_bot
+#      # Пробрасываем ChromaDB (векторное хранилище), чтобы не потерять базу при рестарте
+#      - ./app/chromadb_storage:/app/app/chromadb_storage
+#    depends_on:
+#      - db
+#      - redis
+#    networks:
+#      - bot_net
+
+#  # 2. База данных PostgreSQL
+#  db:
+#    image: postgres:15-alpine
+#    container_name: babykea_postgres
+#    restart: always
+#    environment:
+#      POSTGRES_USER: ${POSTGRES_USER}
+#      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+#      POSTGRES_DB: ${POSTGRES_DB}
+#    volumes:
+#      - postgres_data:/var/lib/postgresql/data
+#    ports:
+#      - "5432:5432" # Оставляем порт открытым, чтобы ты мог подключиться к БД через DBeaver/PgAdmin
+#    networks:
+#      - bot_net
+
+  # 3. Redis (Кэш и FSM)
+  redis:
+    image: redis:7.2-alpine
+    container_name: babykea_redis
+    restart: always
+    command: >
+      --requirepass ${REDIS_PASSWORD}
+      --save 60 1
+      --loglevel warning
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379" # Открываем порт для отладки с локалки
+    networks:
+      - bot_net
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  bot_net:
+    driver: bridge
