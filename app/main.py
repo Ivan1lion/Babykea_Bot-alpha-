@@ -4,7 +4,7 @@ import os
 
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.fsm.storage.redis import RedisStorage, DefaultKeyBuilder
-from redis.asyncio import Redis # Библиотека для работы с Redis
+# from redis.asyncio import Redis # Библиотека для работы с Redis
 from aiogram.enums import ParseMode
 from aiogram.client.bot import DefaultBotProperties
 from aiogram.webhook.aiohttp_server import SimpleRequestHandler, setup_application
@@ -21,18 +21,10 @@ from app.handlers.for_quiz import quiz_router
 from app.comands_menu.bot_menu_cmds import bot_menu, menu_cmds_router
 from app.posting.queue import start_sender
 from app.payments.payment_routes import yookassa_webhook_handler
+from app.redis_client import redis_client as redis
 
 
 
-
-# --- НАСТРОЙКА REDIS ---
-# Читаем данные из переменных окружения (которые придут из docker-compose)
-redis = Redis(
-    host=os.getenv("REDIS_HOST"), # В Docker это будет "redis"
-    port=int(os.getenv("REDIS_PORT")),
-    password=os.getenv("REDIS_PASSWORD"),      # Пароль из .env
-    decode_responses=True                      # Чтобы данные были строками, а не байтами
-)
 
 storage = RedisStorage(redis=redis, key_builder=DefaultKeyBuilder(with_bot_id=True))
 bot = Bot(token=os.getenv("TOKEN"), default=DefaultBotProperties(parse_mode=ParseMode.HTML))

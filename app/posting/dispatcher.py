@@ -2,9 +2,10 @@ from sqlalchemy import select
 
 from aiogram.types import Message
 from app.posting.dto import PostingContext
-from app.posting.queue import enqueue_send
 from app.db.config import session_maker
 from app.db.models import User
+from app.posting.queue import start_broadcast
+from app.db.config import session_maker
 
 
 
@@ -16,8 +17,14 @@ async def dispatch_post(
     async with session_maker() as session:
         users = await _get_target_users(session, context)
 
-    for telegram_id in users:
-        await enqueue_send(telegram_id, message)
+    asyncio.create_task(
+        start_broadcast(
+            bot=bot,
+            session_maker=session_maker,
+            from_chat_id=channel_id,
+            message_id=message_id
+        )
+    )
 
 
 # Получение целевых пользователей
