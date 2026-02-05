@@ -118,3 +118,25 @@ async def increment_requests(session: AsyncSession, telegram_id: int, count: int
         .values(requests_left=User.requests_left + count)
     )
     # commit убран
+
+
+# === ФУНКЦИЯ ДЛЯ ПРЕМИУМ ДОСТУПА ===
+async def activate_premium_subscription(session: AsyncSession, telegram_id: int, count: int):
+    """
+    Активирует полный доступ:
+    1. Начисляет запросы
+    2. Привязывает к техническому магазину (ID 3)
+    3. Устанавливает промокод
+    4. Открывает доступ к меню (снимает флаг)
+    """
+    await session.execute(
+        update(User)
+        .where(User.telegram_id == telegram_id)
+        .values(
+            requests_left=User.requests_left + count,
+            magazine_id=3,                 # Технический магазин
+            promo_code='BABYKEA_PREMIUM',  # Спец код
+            closed_menu_flag=False,        # 🔥 Снимаем флаг (даем доступ к меню)
+            first_catalog_request=False    # 🔥 Снимаем флаг для первого ответа по поиску (что бы не было промо в ответе)
+        )
+    )

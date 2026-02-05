@@ -12,6 +12,7 @@ from app.db.crud import (
     update_receipt_url,
     mark_payment_failed,
     increment_requests,
+    activate_premium_subscription,
 )
 from app.payments.yookassa_client import fetch_payment
 
@@ -19,6 +20,8 @@ logger = logging.getLogger(__name__)
 
 
 async def yookassa_webhook_handler(request: web.Request):
+    # 🔥 ДОБАВЬ ЭТУ СТРОКУ
+    print(f"🔔 ПРИШЕЛ ЗАПРОС НА ВЕБХУК! IP: {get_peer_ip(request)}")
     bot = request.app["bot"]
     skip_ip_check = os.getenv("DEBUG") == "True"
 
@@ -102,7 +105,7 @@ async def yookassa_webhook_handler(request: web.Request):
                     elif amount == Decimal("950.00"):
                         await increment_requests(session, payment.telegram_id, 50)
                     elif amount == Decimal("2.00"):  # Тестовый полный доступ
-                        await increment_requests(session, payment.telegram_id, 49)
+                        await activate_premium_subscription(session, payment.telegram_id, 49)
 
                     # 4. Сохраняем успех и URL чека (если он есть) в базу
                     await mark_payment_succeeded(session, payment_id, receipt_url)
@@ -125,7 +128,8 @@ async def yookassa_webhook_handler(request: web.Request):
         # ---------------------------------------------------------------
         if event == "payment.succeeded":
             if amount == Decimal("2.00") or amount == Decimal("1900.00"):
-                text = "🚀 <b>Полный доступ активирован!</b>"
+                text = ("🚀 <b>Полный доступ активирован!</b>"
+                        "\n\nПерейдите в Меню для выбора подходящего действия")
             else:
                 text = "✅ <b>Оплата прошла успешно!</b>\nЗапросы начислены."
 

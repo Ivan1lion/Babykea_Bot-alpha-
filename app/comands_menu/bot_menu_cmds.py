@@ -201,7 +201,7 @@ async def contacts_cmd(message: Message, session: AsyncSession):
         return
 
     # 🔹 Спец-логика для Babykea
-    if magazine.name == "Babykea":
+    if magazine.name == "[Babykea]":
         await message.answer_photo(
             photo="https://i.postimg.cc/zBSgzjss/i.jpg",
             caption=(
