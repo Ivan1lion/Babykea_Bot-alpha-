@@ -7,7 +7,6 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from aiogram import Router, Bot
 from aiogram.exceptions import TelegramBadRequest
-from app.comands_menu.text_for_user import text_offer
 from app.db.models import User, Magazine
 from app.db.crud import closed_menu
 from app.handlers.keyboards import magazine_map_kb
@@ -29,7 +28,7 @@ bot_menu = [
     BotCommand(command="help", description="🆘 Помощь"),
     BotCommand(command="config", description="👤 Мой профиль"),
     BotCommand(command="contacts", description="📍 Магазин колясок"),
-    BotCommand(command="offer", description="📜 Пользовательское соглашение"),
+    BotCommand(command="offer", description="📃 Пользовательское соглашение"),
 ]
 
 
@@ -243,6 +242,9 @@ async def contacts_cmd(message: Message, session: AsyncSession):
 
 @menu_cmds_router.message(Command("offer"))
 async def offer_cmd(message: Message):
+    text_offer = (f"1. <a href='https://telegra.ph/Oferta-dlya-chat-bota-Babykea-Bot-Babykea-07-14'>Публичная оферта, "
+                  f"Пользовательское соглашение, условия эксплуатации и обслуживания</a>\n\n"
+                  f"2. <a href='https://telegra.ph/Politika-konfidencialnosti-07-26-9'>Политика Конфиденциальности</a>")
     await message.answer(text=text_offer, link_preview_options=LinkPreviewOptions(is_disabled=True))
 
 
