@@ -102,6 +102,8 @@ async def ask_responses_api(user_message: str, system_instruction: str) -> str:
     #     ПОПЫТКА 1: Google Gemini 3 Pro (Основной)
     # ---------------------------------------------------------
     try:
+        # 🔥 Принт для понимания
+        print(f"🔔 ПОПЫТКА 1: Google Gemini 3 Pro (Основной)")
         tools_config = [types.Tool(google_search=types.GoogleSearch())]
 
         generate_config = types.GenerateContentConfig(
@@ -128,6 +130,8 @@ async def ask_responses_api(user_message: str, system_instruction: str) -> str:
         # ПОПЫТКА 2: OpenAI ChatGPT (Резерв)
         # ---------------------------------------------------------
         try:
+            # 🔥 Принт для понимания
+            print(f"🔔 ПОПЫТКА 2: OpenAI ChatGPT (Резерв))")
             messages = [
                 {"role": "system", "content": system_instruction},
                 {"role": "user", "content": user_message}

@@ -20,8 +20,6 @@ logger = logging.getLogger(__name__)
 
 
 async def yookassa_webhook_handler(request: web.Request):
-    # 🔥 ДОБАВЬ ЭТУ СТРОКУ
-    print(f"🔔 ПРИШЕЛ ЗАПРОС НА ВЕБХУК! IP: {get_peer_ip(request)}")
     bot = request.app["bot"]
     skip_ip_check = os.getenv("DEBUG") == "True"
 

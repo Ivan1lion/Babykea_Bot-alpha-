@@ -4,7 +4,6 @@ import os
 
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.fsm.storage.redis import RedisStorage, DefaultKeyBuilder
-# from redis.asyncio import Redis # Библиотека для работы с Redis
 from aiogram.enums import ParseMode
 from aiogram.client.bot import DefaultBotProperties
 from aiogram.webhook.aiohttp_server import SimpleRequestHandler, setup_application

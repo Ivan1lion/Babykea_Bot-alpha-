@@ -34,6 +34,7 @@ from app.openai_assistant.responses_client import ask_responses_api
 from app.openai_assistant.prompts_config import get_system_prompt, get_marketing_footer
 from app.payments.pay_config import PAYMENTS
 from app.services.search_service import search_products
+from app.services.user_service import get_user_cached, update_user_requests, update_user_flags
 
 
 
@@ -203,8 +204,8 @@ async def process_first_auto_request(call: CallbackQuery, state: FSMContext, ses
     await state.set_state(AIChat.catalog_mode)
 
     # 3. Получаем юзера
-    result = await session.execute(select(User).where(User.telegram_id == call.from_user.id))
-    user = result.scalar_one_or_none()
+    # Молниеносные запросы в БД через кэш Redis (что бы снять нагрузку из-за частых, однотипных обращений в БД)
+    user = await get_user_cached(session, call.from_user.id)
     if not user: return
 
     # Проверка лимитов
@@ -325,9 +326,11 @@ async def process_first_auto_request(call: CallbackQuery, state: FSMContext, ses
             await call.message.answer(answer, parse_mode=None, disable_web_page_preview=True)
 
         # Списываем запрос и снимаем флаг для доступа к меню
-        user.requests_left -= 1
-        user.closed_menu_flag = False
-        await session.commit()
+        # --- 🔥 ФИНАЛЬНОЕ СОХРАНЕНИЕ (Используем сервисы) ---
+        # 1. Списываем запрос (обновит БД и Кэш)
+        await update_user_requests(session, user.telegram_id, decrement=1)
+        # 2. Обновляем флаг closed_menu_flag
+        await update_user_flags(session, user.telegram_id, closed_menu_flage=False)
 
     except Exception as e:
         logger.error(f"Error in auto-request: {e}", exc_info=True)
@@ -349,12 +352,14 @@ async def process_mode_selection(callback: CallbackQuery, state: FSMContext):
     if mode == "mode_catalog":
         await state.set_state(AIChat.catalog_mode)
         text = (
-            "👶 **Режим: Подбор коляски**\n\nОпишите, какую коляску вы ищете (например: *'Легкая для самолета'* или "
-            "*'Вездеход для зимы'*).")
+            "👶 Режим: Подбор коляски"
+            "\n\nОпишите, какую коляску вы ищете (например: 'Легкая для самолета' или "
+            "'Вездеход для зимы')")
     else:
         await state.set_state(AIChat.info_mode)
-        text = ("❓ **Режим: Вопрос эксперту**\n\nЗадайте любой вопрос (например: *'Что лучше: Anex или Tutis?'* или "
-                "*'Как смазать колеса?'*).")
+        text = ("❓ Режим: Вопрос эксперту"
+                "\n\nЗадайте любой вопрос (например: 'Что лучше: Anex или Tutis?' или "
+                "'Как смазать колеса?')")
 
     await callback.message.edit_text(text)
     await callback.answer()
@@ -369,8 +374,8 @@ async def handle_ai_message(message: Message, state: FSMContext, session: AsyncS
     # Проверки (промокод, баланс...)
     if await closed_menu(message=message, session=session): return
 
-    result = await session.execute(select(User).where(User.telegram_id == message.from_user.id))
-    user = result.scalar_one_or_none()
+    # Молниеносные запросы в БД через кэш Redis (что бы снять нагрузку из-за частых, однотипных обращений в БД)
+    user = await get_user_cached(session, message.from_user.id)
     if not user: return
 
     if user.requests_left <= 0:
@@ -484,12 +489,12 @@ async def handle_ai_message(message: Message, state: FSMContext, session: AsyncS
             # Если режим Каталога И это первый запрос в каталог
             if user.first_catalog_request:
                 marketing_footer = get_marketing_footer("catalog_mode")
-                user.first_catalog_request = False  # Сжигаем флаг каталога
+                await update_user_flags(session, user.telegram_id, first_catalog_request=False)  # Сжигаем флаг каталога
         else:
             # Если режим Инфо И это первый запрос эксперту
             if user.first_info_request:
                 marketing_footer = get_marketing_footer("info_mode")
-                user.first_info_request = False  # Сжигаем флаг инфо
+                await update_user_flags(session, user.telegram_id, first_info_request=False)  # Сжигаем флаг инфо
 
         # Добавляем футер, если он сгенерировался
         if marketing_footer:
@@ -497,15 +502,17 @@ async def handle_ai_message(message: Message, state: FSMContext, session: AsyncS
 
         # --- ОТПРАВКА ---
         try:
-            # 🔥 ВАЖНО: Используем HTML
             await message.answer(answer, parse_mode=ParseMode.HTML, disable_web_page_preview=True)
         except TelegramBadRequest as e:
             # Если даже HTML сломался (очень редко), логируем и шлем текст
             logger.error(f"HTML Parse Error: {e}")
             await message.answer(answer, parse_mode=None, disable_web_page_preview=True)
 
-        user.requests_left -= 1
-        await session.commit()
+        # 🔥 Вместо (списание запросов):
+        # user.requests_left -= 1
+        # await session.commit()
+        # Обновляем атомарно и БД, и Кэш
+        await update_user_requests(session, user.telegram_id, decrement=1)
 
     except Exception as e:
         logger.error(f"Error: {e}", exc_info=True)
@@ -531,14 +538,13 @@ async def handle_no_state(message: Message, bot:Bot, session: AsyncSession):
     if await closed_menu(message=message, session=session):
         return
 
-    result = await session.execute(select(User).where(User.telegram_id == message.from_user.id))
-    user = result.scalar_one_or_none()
+    # 🚀 Получаем данные мгновенно из Redis
+    user = await get_user_cached(session, message.from_user.id)
+
     # 3. ЛОГИКА ПРОВЕРКИ
-    # Условие: is_first_request = False И show_intro_message = True
     if user.show_intro_message:
-        # Меняем флаг на False, чтобы это сообщение больше не показывалось
-        user.show_intro_message = False
-        await session.commit()  # Сохраняем изменение в БД
+        # 🚀 Обновляем флаг через сервис (БД обновляется, кэш сбрасывается)
+        await update_user_flags(session, user.telegram_id, show_intro_message=False)
 
         # Отправляем "Красивое" сообщение (copy_message)
         try:

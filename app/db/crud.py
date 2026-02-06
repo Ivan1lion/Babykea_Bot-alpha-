@@ -6,29 +6,36 @@ from aiogram.types import Message
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from openai import AsyncOpenAI
+
 from app.db.models import ChannelState, MagazineChannel, MyChannel, User, Payment
+from app.services.user_service import get_user_cached
 
 # Инициализируем OpenAI клиента один раз
 client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 # для постинга
 channel = int(os.getenv("CHANNEL_ID"))
 
+
+
 # Не давать доступ к МЕНЮ если не введен промо-код
 async def closed_menu(message: Message, session: AsyncSession, delete_delay: int = 1) -> bool:
-    result = await session.execute(
-        select(User.closed_menu_flag).where(User.telegram_id == message.from_user.id)
-    )
-    closed_menu_flag = result.scalar_one_or_none()
+    # 1. Достаем юзера из КЭША (Redis)
+    # Если его там нет, функция сама сходит в БД и сохранит в кэш
+    user = await get_user_cached(session, message.from_user.id)
 
-    if closed_menu_flag==False:
-        return False  # НЕ останавливаем хэндлер
+    # 2. Проверяем флаг (берем из объекта кэша)
+    # Если юзера нет или флаг False (меню открыто) -> пропускаем
+    if not user or not user.closed_menu_flag:
+        return False
 
-    # closed_menu_flag==True → останавливаем
+        # 3. Если флаг True (меню закрыто) -> блокируем
     await message.delete()
     warn_message = await message.answer("Завершите действие⤴️")
     await asyncio.sleep(delete_delay)
     await warn_message.delete()
     return True
+
+
 
 ###  ###  ###  Для БД ###  ###  ###
 
