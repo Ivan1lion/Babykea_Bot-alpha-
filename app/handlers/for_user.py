@@ -35,6 +35,7 @@ from app.openai_assistant.prompts_config import get_system_prompt, get_marketing
 from app.payments.pay_config import PAYMENTS
 from app.services.search_service import search_products
 from app.services.user_service import get_user_cached, update_user_requests, update_user_flags
+from app.redis_client import redis_client
 
 
 
@@ -62,6 +63,23 @@ TOP_SHOPS_IDS = [2]
 @for_user_router.message(CommandStart())
 async def cmd_start(message: Message, bot: Bot, session: AsyncSession):
     await get_or_create_user(session, message.from_user.id, message.from_user.username)
+    # 1. Пытаемся отправить мгновенно через Redis (PRO способ)
+    # Мы ищем file_id, который сохранили под именем "intro_video"
+    video_note_id = await redis_client.get("media:intro_video")
+
+    if video_note_id:
+        try:
+            await message.answer_video_note(
+                video_note=video_note_id,
+                reply_markup=kb.quiz_start
+            )
+            print(f"🔔 ПОПЫТКА 1: Redis)")
+            return  # Успех, выходим
+        except Exception as e:
+            logger.error(f"Ошибка отправки video_note из Redis: {e}")
+
+    # 2. FALLBACK 1: Если в Redis пусто, пробуем copy_message (Старый способ)
+    # Это страховка на случай, если ты забыл загрузить видео в тех.канал
     try:
         await bot.copy_message(
             chat_id=message.chat.id,
@@ -69,13 +87,31 @@ async def cmd_start(message: Message, bot: Bot, session: AsyncSession):
             message_id=4,  # ID сообщения из группы
             reply_markup=kb.quiz_start
         )
-    except Exception as e:
-        # Получаем абсолютный путь к медиа-файлу
+        print(f"🔔 ПОПЫТКА 2: Пересылка из канала)")
+        return
+    except Exception:
+        pass  # Идем к самому надежному варианту
+
+    # 4. FALLBACK 2: Если всё сломалось — файл с диска (Железобетонный вариант)
+    # ВАЖНО: answer_video отправляет ПРЯМОУГОЛЬНИК.
+    # Если нужен КРУЖОК с диска, используй answer_video_note (но файл должен быть квадратным 1:1)
+    try:
         BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-        GIF_PATH = os.path.join(BASE_DIR, "..", "mediafile_for_bot", "video.mp4")
-        gif_file = FSInputFile(GIF_PATH)
-        # Отправляем медиа
-        wait_msg = await message.answer_video(video=gif_file, supports_streaming=True, reply_markup=kb.quiz_start)
+        # Убедись, что путь правильный
+        VIDEO_PATH = os.path.join(BASE_DIR, "..", "mediafile_for_bot", "video.mp4")
+        video_file = FSInputFile(VIDEO_PATH)
+
+        # Если файл на диске - это обычное видео, используй answer_video
+        await message.answer_video(
+            video=video_file,
+            supports_streaming=True,
+            reply_markup=kb.quiz_start
+        )
+    except Exception as e:
+        logger.critical(f"❌ CRITICAL: Не удалось отправить приветствие: {e}")
+        # Хотя бы текст отправим, чтобы бот не молчал
+        await message.answer("Добро пожаловать!", reply_markup=kb.quiz_start)
+
 
 
 
@@ -766,7 +802,7 @@ async def process_payment(
 # Отправка сообщений/постов из каналов
 
 @for_user_router.channel_post()
-async def channel_post_handler(message: Message) -> None:
+async def channel_post_handler(message: Message, bot: Bot) -> None:
     """
     Entry point для всех постов из каналов
     """
@@ -776,14 +812,17 @@ async def channel_post_handler(message: Message) -> None:
     if context is None:
         return
 
-    # 2. Проверяем — новый ли это пост
-    if not await is_new_post(context, message.message_id):
+    # 2. Проверяем — новый ли это пост (теперь передаем message.date)
+    # 🔥 ИСПРАВЛЕНО: добавил message.date для проверки "свежести"
+    if not await is_new_post(context, message.message_id, message.date):
         return
 
-    # 3. Отправляем пост в очередь рассылки
+    # 3. Отправляем пост в диспетчер (он сам решит: кэшировать или рассылать)
+    # 🔥 ИСПРАВЛЕНО: добавил передачу объекта bot
     await dispatch_post(
         context=context,
         message=message,
+        bot=bot
     )
 
 

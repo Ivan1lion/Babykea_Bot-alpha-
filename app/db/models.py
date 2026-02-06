@@ -113,9 +113,8 @@ class MagazineChannel(Base):
     __tablename__ = "magazine_channels"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    magazine_id: Mapped[int] = mapped_column(ForeignKey("magazines.id"), nullable=False)
+    magazine_id: Mapped[int] = mapped_column(ForeignKey("magazines.id", ondelete="CASCADE"), nullable=False)
     channel_id: Mapped[int] = mapped_column(BigInteger, unique=True, nullable=False)
-    channel_type: Mapped[str] = mapped_column(String(20), nullable=False)
     is_active: Mapped[bool] = mapped_column(default=True)
 
 
@@ -159,9 +158,17 @@ class MyPost(Base):
     channel_id: Mapped[int] = mapped_column(BigInteger, unique=True, nullable=False)
     post_id: Mapped[int] = mapped_column(nullable=False)
 
+#8 🔥 Технический канал (для загрузки файлов в Redis)
+class TechChannel(Base):
+    __tablename__ = "tech_channels"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    channel_id: Mapped[int] = mapped_column(BigInteger, unique=True, nullable=False)
+    description: Mapped[str] = mapped_column(String, nullable=True)  # Пометка чей это канал
 
 
-#7 Таблица оплаты для решения дублей webhook
+
+#9 Таблица оплаты для решения дублей webhook
 class Payment(Base):
     __tablename__ = "payments"
 

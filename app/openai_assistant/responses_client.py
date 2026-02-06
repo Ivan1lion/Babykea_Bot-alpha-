@@ -144,10 +144,9 @@ async def ask_responses_api(user_message: str, system_instruction: str) -> str:
             ]
 
             response = await openai_client.chat.completions.create(
-                model="gpt-5.2", #gpt-5.2-thinking
+                model="gpt-5.2",
                 messages=messages,
-                # reasoning={"effort": "high"},
-                temperature=0.7,
+                reasoning={"effort": "high"},
                 timeout=60.0  # Таймаут 30 секунд
             )
             raw_answer = response.choices[0].message.content or ""
