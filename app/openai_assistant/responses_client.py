@@ -109,13 +109,19 @@ async def ask_responses_api(user_message: str, system_instruction: str) -> str:
         generate_config = types.GenerateContentConfig(
             temperature=1.0,
             system_instruction=system_instruction,
-            tools=tools_config
+            tools=tools_config,
+            response_modalities=["TEXT"]  # Явно указываем что отвечать нужно текстом
         )
 
-        response = await google_client.aio.models.generate_content(
-            model="gemini-3-flash-preview",
-            contents=user_message,
-            config=generate_config
+        # 🔥 ДОБАВЛЕНО: asyncio.wait_for ставит жесткий лимит 60 сек
+        # Если Google думает дольше - бросаем ошибку и идем к OpenAI
+        response = await asyncio.wait_for(
+            google_client.aio.models.generate_content(
+                model="gemini-2.0-flash",  # Исправил имя модели на стабильное
+                contents=user_message,
+                config=generate_config
+            ),
+            timeout=60.0
         )
 
         if response.text:
@@ -138,9 +144,11 @@ async def ask_responses_api(user_message: str, system_instruction: str) -> str:
             ]
 
             response = await openai_client.chat.completions.create(
-                model="gpt-5.2",  # Или gpt-4o
+                model="gpt-5.2", #gpt-5.2-thinking
                 messages=messages,
-                temperature=0.7
+                # reasoning={"effort": "high"},
+                temperature=0.7,
+                timeout=60.0  # Таймаут 30 секунд
             )
             raw_answer = response.choices[0].message.content or ""
 

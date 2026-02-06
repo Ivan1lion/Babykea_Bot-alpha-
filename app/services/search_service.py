@@ -1,4 +1,5 @@
 import os
+import asyncio
 import re
 import logging
 import chromadb
@@ -118,10 +119,16 @@ async def search_products(
         fetch_multiplier = 4
         fetch_k = int(top_k * fetch_multiplier)
 
-        results = collection.query(
-            query_embeddings=[vector],
-            n_results=fetch_k
-        )
+        # 🔥🔥🔥 Мы говорим Python: "Выполни эту тяжелую функцию в отдельном потоке,
+        # а мы пока подождем (await), но других юзеров блокировать не будем".
+        def run_query():
+            return collection.query(
+                query_embeddings=[vector],
+                n_results=fetch_k
+            )
+
+        results = await asyncio.to_thread(run_query)
+        # 🔥🔥🔥 КОНЕЦ 🔥🔥🔥
 
         # Chroma возвращает структуру: {'ids': [[]], 'metadatas': [[]], 'distances': [[]]}
         # Проверяем, есть ли результаты
