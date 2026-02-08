@@ -158,6 +158,9 @@ class MyPost(Base):
     channel_id: Mapped[int] = mapped_column(BigInteger, unique=True, nullable=False)
     post_id: Mapped[int] = mapped_column(nullable=False)
 
+
+
+
 #8 🔥 Технический канал (для загрузки файлов в Redis)
 class TechChannel(Base):
     __tablename__ = "tech_channels"
@@ -165,6 +168,7 @@ class TechChannel(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     channel_id: Mapped[int] = mapped_column(BigInteger, unique=True, nullable=False)
     description: Mapped[str] = mapped_column(String, nullable=True)  # Пометка чей это канал
+
 
 
 

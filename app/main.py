@@ -18,7 +18,6 @@ from app.middlewares.db_session import DataBaseSession
 from app.handlers.for_user import for_user_router
 from app.handlers.for_quiz import quiz_router
 from app.comands_menu.bot_menu_cmds import bot_menu, menu_cmds_router
-from app.posting.queue import start_sender
 from app.payments.payment_routes import yookassa_webhook_handler
 from app.redis_client import redis_client as redis
 
@@ -65,7 +64,7 @@ async def on_startup(dispatcher: Dispatcher):
                                              f"\n\nДля запуска бота нажмите пожалуйста кнопку ниже👇")
     await bot.set_my_short_description(short_description=f"Сервис по подбору (поиску) детских колясок. Разработан "
                                                          f"для молодых родителей")
-    asyncio.create_task(start_sender(bot)) # 🔹 запуск очереди рассылки (ВАЖНО)
+
 
 
 

@@ -8,34 +8,62 @@ logger = logging.getLogger(__name__)
 async def cache_media_from_post(message: Message):
     """
     Сохраняет file_id медиа-файла в Redis.
-    Ключ берется из CAPTION (подписи) к посту.
-    Пример: Постишь видео с подписью 'intro_video' -> в Redis летит 'media:intro_video' = 'file_id'
+    Работает в двух режимах:
+    1. Прямой пост с подписью (для фото/видео).
+    2. РЕПЛАЙ (ОТВЕТ) текстом на медиа (для кружочков).
     """
-    if not message.caption:
-        return  # Нет подписи - не знаем как назвать этот файл
 
-    # Очищаем подпись от пробелов и делаем маленькими буквами для надежности
-    key_name = message.caption.strip()
-    redis_key = f"media:{key_name}"
-
+    key_name = None
     file_id = None
 
-    # Определяем тип медиа
-    if message.video:
-        file_id = message.video.file_id
-    elif message.photo:
-        # Берем последнее фото (оно самое качественное)
-        file_id = message.photo[-1].file_id
-    elif message.document:
-        file_id = message.document.file_id
-    elif message.animation:
-        file_id = message.animation.file_id
-    elif message.voice:
-        file_id = message.voice.file_id
+    # --- СЦЕНАРИЙ 1: Реплай (Ответ) на сообщение ---
+    # (Идеально для кружочков, у которых нет подписи)
+    if message.reply_to_message and message.text:
+        key_name = message.text.strip()  # Имя ключа берем из текста ответа (например "intro_video")
+        media_msg = message.reply_to_message  # А файл ищем в том сообщении, на которое ответили
 
-    if file_id:
-        # Сохраняем навечно (или пока не перезапишем новым постом)
+        if media_msg.video_note:
+            file_id = media_msg.video_note.file_id
+        elif media_msg.video:
+            file_id = media_msg.video.file_id
+        elif media_msg.photo:
+            file_id = media_msg.photo[-1].file_id
+        elif media_msg.document:
+            file_id = media_msg.document.file_id
+        elif media_msg.voice:
+            file_id = media_msg.voice.file_id
+
+    # --- СЦЕНАРИЙ 2: Обычный пост с подписью ---
+    # (Работает для обычных видео и картинок)
+    elif message.caption:
+        key_name = message.caption.strip()
+
+        if message.video:
+            file_id = message.video.file_id
+        elif message.photo:
+            file_id = message.photo[-1].file_id
+        elif message.document:
+            file_id = message.document.file_id
+        elif message.animation:
+            file_id = message.animation.file_id
+        elif message.voice:
+            file_id = message.voice.file_id
+
+    # --- СОХРАНЕНИЕ ---
+    if key_name and file_id:
+        # Приводим ключ к нижнему регистру для надежности
+        redis_key = f"media:{key_name}"
+
+        # Сохраняем в Redis
         await redis_client.set(redis_key, file_id)
-        logger.info(f"✅ MEDIA CACHED: {redis_key} -> {file_id}")
-    else:
-        logger.warning(f"⚠️ Пост в тех.канале с подписью '{key_name}', но без медиа-файла.")
+
+        logger.info(f"✅ MEDIA CACHED (via Reply/Caption): {redis_key} -> {file_id}")
+
+        # (Опционально) Можем отправить реакцию или ответ, чтобы ты видел, что бот "съел" файл
+        try:
+            await message.react([{"type": "emoji", "emoji": "nm"}])  # Ставит реакцию "ОК" (если бот админ)
+        except:
+            pass
+
+    elif key_name and not file_id:
+        logger.warning(f"⚠️ Попытка сохранить '{key_name}', но медиа-файл не найден.")

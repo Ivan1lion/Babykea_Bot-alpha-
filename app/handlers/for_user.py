@@ -84,7 +84,7 @@ async def cmd_start(message: Message, bot: Bot, session: AsyncSession):
         await bot.copy_message(
             chat_id=message.chat.id,
             from_chat_id=-1003498991864, # ID группы
-            message_id=4,  # ID сообщения из группы
+            message_id=28,  # ID сообщения из группы
             reply_markup=kb.quiz_start
         )
         print(f"🔔 ПОПЫТКА 2: Пересылка из канала)")
@@ -92,7 +92,7 @@ async def cmd_start(message: Message, bot: Bot, session: AsyncSession):
     except Exception:
         pass  # Идем к самому надежному варианту
 
-    # 4. FALLBACK 2: Если всё сломалось — файл с диска (Железобетонный вариант)
+    # 3. FALLBACK 2: Если всё сломалось — файл с диска (Железобетонный вариант)
     # ВАЖНО: answer_video отправляет ПРЯМОУГОЛЬНИК.
     # Если нужен КРУЖОК с диска, используй answer_video_note (но файл должен быть квадратным 1:1)
     try:
@@ -366,7 +366,7 @@ async def process_first_auto_request(call: CallbackQuery, state: FSMContext, ses
         # 1. Списываем запрос (обновит БД и Кэш)
         await update_user_requests(session, user.telegram_id, decrement=1)
         # 2. Обновляем флаг closed_menu_flag
-        await update_user_flags(session, user.telegram_id, closed_menu_flage=False)
+        await update_user_flags(session, user.telegram_id, closed_menu_flag=False)
 
     except Exception as e:
         logger.error(f"Error in auto-request: {e}", exc_info=True)

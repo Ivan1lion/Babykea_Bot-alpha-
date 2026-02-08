@@ -111,6 +111,7 @@ async def quiz_select_option(
         profile=profile,
         selected=selected_option,
     )
+    await call.answer()
 
 
 
