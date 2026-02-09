@@ -1,14 +1,18 @@
 import os
+import re
 import asyncio
+from aiogram import Router, Bot, F
 from aiogram.types import BotCommand
-from aiogram.filters import Command
+from aiogram.filters import Command, StateFilter
 from aiogram.types import Message, FSInputFile, LinkPreviewOptions
+from aiogram.fsm.context import FSMContext
+from aiogram.exceptions import TelegramBadRequest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from aiogram import Router, Bot
-from aiogram.exceptions import TelegramBadRequest
 from app.db.models import User, Magazine
 from app.db.crud import closed_menu
+from app.comands_menu.states import MenuStates
+from app.comands_menu.crud_for_menu import update_user_email
 from app.handlers.keyboards import magazine_map_kb
 import app.handlers.keyboards as kb
 from app.redis_client import redis_client
@@ -16,7 +20,8 @@ from app.services.user_service import get_user_cached, update_user_requests, upd
 
 
 
-
+# Простая регулярка для email
+EMAIL_REGEX = r"^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$"
 
 menu_cmds_router = Router()
 
@@ -77,21 +82,17 @@ async def cmd_ai_consultant(message: Message, bot:Bot, session: AsyncSession):
     if await closed_menu(message=message, session=session):
         return
 
-    # result = await session.execute(select(User).where(User.telegram_id == message.from_user.id))
-    # user = result.scalar_one_or_none()
     # 🚀 Получаем данные мгновенно из Redis
     user = await get_user_cached(session, message.from_user.id)
     # ЛОГИКА ПРОВЕРКИ
     # Условие: is_first_request = False И show_intro_message = True
     if user.show_intro_message:
         # Меняем флаг на False, чтобы это сообщение больше не показывалось
-        # user.show_intro_message = False
-        # await session.commit()  # Сохраняем изменение в БД
-        # 🚀 Обновляем флаг через сервис (БД обновляется, кэш сбрасывается)
+        # 🚀 Обновляем флаг через Redis (БД обновляется, кэш сбрасывается)
         await update_user_flags(session, user.telegram_id, show_intro_message=False)
 
         # 1. Пытаемся отправить мгновенно через Redis (PRO способ)
-        # Мы ищем file_id, который сохранили под именем "intro_video"
+        # Мы ищем file_id, который сохранили под именем "ai_intro"
         video_note_id = await redis_client.get("media:ai_intro")
 
         if video_note_id:
@@ -154,14 +155,20 @@ async def cmd_ai_consultant(message: Message, bot:Bot, session: AsyncSession):
             )
 
     else:
-        # ИНАЧЕ -> Отправляем обычное сообщение
+        # Делаем "точечный" запрос в БД только за балансом
+        # Это гарантирует 100% точность, игнорируя старый кэш
+        result = await session.execute(
+            select(User.requests_left).where(User.telegram_id == message.from_user.id)
+        )
+        # Если база вернет None (маловероятно), подстрахуемся 0
+        real_balance = result.scalar_one_or_none() or 0
         await message.answer(
             text=f"👋 Чтобы я мог помочь, выберите, пожалуйста, режим работы:"
             f"\n\n<b>[Подобрать коляску]</b> - только для поиска (подбора) подходящей для Вас коляски"
             f"\n\n<b>[Другой запрос]</b> - для консультаций, решений вопросов по эксплуатации,анализа и сравнения уже известных "
             f"Вам моделей колясок"
             f"\n\n<blockquote>Количество запросов\n"
-            f"на вашем балансе: [ {user.requests_left} ]</blockquote>",
+            f"на вашем балансе: [ {real_balance} ]</blockquote>",
             reply_markup=kb.get_ai_mode_with_balance_kb()
         )
 
@@ -197,7 +204,7 @@ async def help_cmd(message: Message, session: AsyncSession):
 
 
 
-
+###########################################################################################################
 @menu_cmds_router.message(Command("config"))
 async def config_cmd(message: Message, session: AsyncSession):
 
@@ -214,6 +221,55 @@ async def config_cmd(message: Message, session: AsyncSession):
                          f"\n\n3. Сохраненная информация")
 
 
+
+
+# --- 1. Команда /email ---
+@menu_cmds_router.message(Command("email"))
+async def cmd_email_start(message: Message, state: FSMContext, session: AsyncSession):
+
+    await message.answer(
+        "📧 <b>Укажите ваш Email</b> для получения чеков.\n\n"
+        "Отправьте адрес электронной почты в ответном сообщении 👇\n"
+        "<i>(Или введите /cancel для отмены)</i>"
+    )
+    await state.set_state(MenuStates.waiting_for_email)
+
+
+# --- 2. Ловим ввод Email (валидация и сохранение) ---
+@menu_cmds_router.message(StateFilter(MenuStates.waiting_for_email))
+async def process_email_input(message: Message, state: FSMContext, session: AsyncSession):
+    email = message.text.strip().lower()
+
+    # Если пользователь передумал
+    if email.lower() == '/cancel':
+        await message.answer("Ввод email отменен")
+        await state.clear()
+        return
+
+    # Проверка формата (Валидация)
+    if not re.match(EMAIL_REGEX, email):
+        await message.answer(
+            "❌ <b>Некорректный формат email</b>\n\n"
+            "Пожалуйста, проверьте адрес и попробуйте снова.\n"
+            "Пример: <code>example@mail.ru</code>"
+        )
+        return  # Не сбрасываем состояние, ждем повторного ввода
+
+    # Сохранение в БД
+    try:
+        await update_user_email(session, message.from_user.id, email)
+        await message.answer(f"✅ <b>Email сохранен!</b>"
+                             f"\n\nЧеки будут приходить на: <code>{email}</code>"
+                             )
+        await state.clear()
+    except Exception as e:
+        await message.answer("Ошибка при сохранении. Попробуйте позже.")
+        print(f"Error saving email: {e}")
+        await state.clear()
+
+
+
+#########################################################################################################
 
 
 @menu_cmds_router.message(Command("contacts"))

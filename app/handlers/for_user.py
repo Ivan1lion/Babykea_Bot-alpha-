@@ -694,6 +694,10 @@ async def process_payment(
     if not user:
         return
 
+    # 🆕 ОПРЕДЕЛЯЕМ EMAIL ДЛЯ ЧЕКА
+    # Если у пользователя в БД есть email, берем его. Иначе — технический.
+    receipt_email = user.email if user.email else "prokolyasky@yandex.ru"
+
     # ---------- payload для YooKassa ----------
     payment_payload = {
         "amount": {
@@ -712,7 +716,7 @@ async def process_payment(
         },
         "receipt": {
             "customer": {
-                "email": "tobedrive@yandex.ru",
+                "email": receipt_email,
             },
             "tax_system_code": 2,
             "items": [
