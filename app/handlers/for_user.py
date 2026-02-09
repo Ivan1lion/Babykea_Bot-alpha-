@@ -410,11 +410,15 @@ async def handle_ai_message(message: Message, state: FSMContext, session: AsyncS
     # Проверки (промокод, баланс...)
     if await closed_menu(message=message, session=session): return
 
-    # Молниеносные запросы в БД через кэш Redis (что бы снять нагрузку из-за частых, однотипных обращений в БД)
-    user = await get_user_cached(session, message.from_user.id)
-    if not user: return
+    # Делаем "точечный" запрос в БД только за балансом
+    # Это гарантирует 100% точность, игнорируя старый кэш
+    result = await session.execute(
+        select(User.requests_left).where(User.telegram_id == message.from_user.id)
+    )
+    # Если база вернет None (маловероятно), подстрахуемся 0
+    real_balance = result.scalar_one_or_none() or 0
 
-    if user.requests_left <= 0:
+    if real_balance <= 0:
         await message.answer(
             f"💡 Чтобы я мог выдать точный результат и завершить персональный анализ под ваши условия, выберите "
             f"пакет запросов ниже"
@@ -433,6 +437,9 @@ async def handle_ai_message(message: Message, state: FSMContext, session: AsyncS
     typing_msg = await message.answer("🤔 Думаю..." if not is_catalog_mode else "🔍 Ищу варианты...")
 
     try:
+        # Молниеносные запросы в БД через кэш Redis (что бы снять нагрузку из-за частых, однотипных обращений в БД)
+        user = await get_user_cached(session, message.from_user.id)
+        if not user: return
         # --- СБОР ДАННЫХ ---
         mag_result = await session.execute(select(Magazine).where(Magazine.id == user.magazine_id))
         current_magazine = mag_result.scalar_one_or_none()
@@ -545,8 +552,6 @@ async def handle_ai_message(message: Message, state: FSMContext, session: AsyncS
             await message.answer(answer, parse_mode=None, disable_web_page_preview=True)
 
         # 🔥 Вместо (списание запросов):
-        # user.requests_left -= 1
-        # await session.commit()
         # Обновляем атомарно и БД, и Кэш
         await update_user_requests(session, user.telegram_id, decrement=1)
 
@@ -640,14 +645,20 @@ async def handle_no_state(message: Message, bot:Bot, session: AsyncSession):
                 reply_markup=kb.get_ai_mode_kb()
             )
     else:
-        # ИНАЧЕ -> Отправляем обычное сообщение
+        # Делаем "точечный" запрос в БД только за балансом
+        # Это гарантирует 100% точность, игнорируя старый кэш
+        result = await session.execute(
+            select(User.requests_left).where(User.telegram_id == message.from_user.id)
+        )
+        # Если база вернет None (маловероятно), подстрахуемся 0
+        real_balance = result.scalar_one_or_none() or 0
         await message.answer(
             f"👋 Чтобы я мог помочь, выберите, пожалуйста, режим работы:"
             f"\n\n<b>[Подобрать коляску]</b> - только для поиска (подбора) подходящей для Вас коляски"
             f"\n\n<b>[Другой запрос]</b> - для консультаций, решений вопросов по эксплуатации,анализа и сравнения уже известных "
             f"Вам моделей колясок"
             f"\n\n<blockquote>Количество запросов\n"
-            f"на вашем балансе: [ {user.requests_left} ]</blockquote>",
+            f"на вашем балансе: [ {real_balance} ]</blockquote>",
             reply_markup=kb.get_ai_mode_with_balance_kb()
         )
 
