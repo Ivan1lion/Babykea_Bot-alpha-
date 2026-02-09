@@ -11,6 +11,8 @@ from app.db.models import User, Magazine
 from app.db.crud import closed_menu
 from app.handlers.keyboards import magazine_map_kb
 import app.handlers.keyboards as kb
+from app.redis_client import redis_client
+from app.services.user_service import get_user_cached, update_user_requests, update_user_flags
 
 
 
@@ -75,21 +77,49 @@ async def cmd_ai_consultant(message: Message, bot:Bot, session: AsyncSession):
     if await closed_menu(message=message, session=session):
         return
 
-    result = await session.execute(select(User).where(User.telegram_id == message.from_user.id))
-    user = result.scalar_one_or_none()
-    # 3. ЛОГИКА ПРОВЕРКИ
+    # result = await session.execute(select(User).where(User.telegram_id == message.from_user.id))
+    # user = result.scalar_one_or_none()
+    # 🚀 Получаем данные мгновенно из Redis
+    user = await get_user_cached(session, message.from_user.id)
+    # ЛОГИКА ПРОВЕРКИ
     # Условие: is_first_request = False И show_intro_message = True
     if user.show_intro_message:
         # Меняем флаг на False, чтобы это сообщение больше не показывалось
-        user.show_intro_message = False
-        await session.commit()  # Сохраняем изменение в БД
+        # user.show_intro_message = False
+        # await session.commit()  # Сохраняем изменение в БД
+        # 🚀 Обновляем флаг через сервис (БД обновляется, кэш сбрасывается)
+        await update_user_flags(session, user.telegram_id, show_intro_message=False)
 
-        # Отправляем "Красивое" сообщение (copy_message)
+        # 1. Пытаемся отправить мгновенно через Redis (PRO способ)
+        # Мы ищем file_id, который сохранили под именем "intro_video"
+        video_note_id = await redis_client.get("media:ai_intro")
+
+        if video_note_id:
+            try:
+                await message.answer_video_note(
+                    video_note=video_note_id
+                )
+                await asyncio.sleep(1)
+                await message.answer(
+                    text="AI-консультант готов к работе!\n\n"
+                         "Он умеет подбирать коляски, а также отвечать на любые вопросы по эксплуатации\n\n"
+                         "👇 Выберите режим работы:"
+                         "\n\n<b>[Подобрать коляску]</b> - только для поиска (подбора) подходящей для Вас коляски"
+                         "\n\n<b>[Другой запрос]</b> - для консультаций, решений вопросов по эксплуатации,анализа и "
+                         "сравнения уже известных Вам моделей колясок",
+                    reply_markup=kb.get_ai_mode_kb()
+                )
+                print(f"🔔 ПОПЫТКА 1 для AI: Redis)")
+                return  # Успех, выходим
+            except Exception as e:
+                logger.error(f"Ошибка отправки video_note из Redis: {e}")
+
+        # 2. Если Рэдис сдох. Отправляем "Красивое" сообщение из канала (copy_message)
         try:
             await bot.copy_message(
                 chat_id=message.chat.id,
                 from_chat_id=-1003498991864,  # ID группы
-                message_id=4,  # ID сообщения из группы
+                message_id=28,  # ID сообщения из группы
             )
             await asyncio.sleep(1)
             await message.answer(
@@ -101,21 +131,25 @@ async def cmd_ai_consultant(message: Message, bot:Bot, session: AsyncSession):
                      "сравнения уже известных Вам моделей колясок",
                 reply_markup=kb.get_ai_mode_kb()
             )
+            print(f"🔔 ПОПЫТКА 2 для AI: Redis)")
         except TelegramBadRequest:
             # Получаем абсолютный путь к медиа-файлу
             BASE_DIR = os.path.dirname(os.path.abspath(__file__))
             GIF_PATH = os.path.join(BASE_DIR, "..", "mediafile_for_bot", "video.mp4")
             gif_file = FSInputFile(GIF_PATH)
             # Отправляем медиа
-            wait_msg = await message.answer_video(
+            await message.answer_video(
                 video=gif_file,
-                caption="AI-консультант готов к работе!\n\n"
+                supports_streaming=True
+            )
+            await asyncio.sleep(1)
+            await message.answer(
+                text="AI-консультант готов к работе!\n\n"
                         "Он умеет подбирать коляски, а также отвечать на любые вопросы по эксплуатации\n\n"
                         "👇 Выберите режим работы:"
                         "\n\n<b>[Подобрать коляску]</b> - только для поиска (подбора) подходящей для Вас коляски"
                         "\n\n<b>[Другой запрос]</b> - для консультаций, решений вопросов по эксплуатации,анализа и "
                         "сравнения уже известных Вам моделей колясок",
-                supports_streaming=True,
                 reply_markup=kb.get_ai_mode_kb()
             )
 
