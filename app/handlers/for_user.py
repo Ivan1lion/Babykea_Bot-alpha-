@@ -365,8 +365,8 @@ async def process_first_auto_request(call: CallbackQuery, state: FSMContext, ses
         # --- 🔥 ФИНАЛЬНОЕ СОХРАНЕНИЕ (Используем сервисы) ---
         # 1. Списываем запрос (обновит БД и Кэш)
         await update_user_requests(session, user.telegram_id, decrement=1)
-        # 2. Обновляем флаг closed_menu_flag
-        await update_user_flags(session, user.telegram_id, closed_menu_flag=False)
+        # 2. Обновляем флаг closed_menu_flag и first_catalog_request
+        await update_user_flags(session, user.telegram_id, closed_menu_flag=False, first_catalog_request=False)
 
     except Exception as e:
         logger.error(f"Error in auto-request: {e}", exc_info=True)
