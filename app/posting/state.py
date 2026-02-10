@@ -1,10 +1,10 @@
 import logging
 from datetime import datetime, timedelta, timezone
-from sqlalchemy import select
-from sqlalchemy.dialects.postgresql import insert
+from sqlalchemy import select, update
+# from sqlalchemy.dialects.postgresql import insert
 
 from app.db.config import session_maker
-from app.db.models import ChannelState, MyPost
+from app.db.models import MagazineChannel, MyChannel
 from app.posting.dto import PostingContext
 
 logger = logging.getLogger(__name__)
@@ -26,9 +26,9 @@ async def is_new_post(
         return True
 
     # 2. Проверка на "старость" (Recovery Mode)
-    # Если посту больше 1 часа, мы считаем его устаревшим для рассылки
+    # Если посту больше 24 часа, мы считаем его устаревшим для рассылки
     # Но мы должны обновить базу, чтобы бот знал, что этот пост "видел"
-    is_too_old = (datetime.now(timezone.utc) - message_date) > timedelta(hours=1)
+    is_too_old = (datetime.now(timezone.utc) - message_date) > timedelta(hours=24)
 
     async with session_maker() as session:
         if context.source_type == "magazine":
@@ -45,39 +45,50 @@ async def is_new_post(
     return is_new
 
 
-# --- Внутренние функции (БЕЗ ИЗМЕНЕНИЙ логики UPSERT) ---
+# --- Внутренние функции ---
 
 async def _check_magazine_channel_post(session, context: PostingContext, message_id: int) -> bool:
-    stmt = select(ChannelState.post_id).where(ChannelState.channel_id == context.channel_id).limit(1)
+    # 1. Получаем текущий last_post_id из таблицы канала магазина
+    stmt = select(MagazineChannel.last_post_id).where(MagazineChannel.channel_id == context.channel_id)
     result = await session.execute(stmt)
     last_post_id = result.scalar_one_or_none()
 
-    if last_post_id is not None and message_id <= last_post_id:
+    # Если канала нет в базе или пост старый — выходим
+    if last_post_id is None:
+        return False  # Странная ситуация, канал должен быть
+
+    if message_id <= last_post_id:
         return False
 
-    upsert_stmt = (
-        insert(ChannelState)
-        .values(channel_id=context.channel_id, post_id=message_id, magazine_id=context.magazine_id)
-        .on_conflict_do_update(index_elements=[ChannelState.channel_id], set_={"post_id": message_id})
+    # 2. Обновляем ID (Простой UPDATE)
+    update_stmt = (
+        update(MagazineChannel)
+        .where(MagazineChannel.channel_id == context.channel_id)
+        .values(last_post_id=message_id)
     )
-    await session.execute(upsert_stmt)
+    await session.execute(update_stmt)
     await session.commit()
     return True
 
 
 async def _check_my_channel_post(session, context: PostingContext, message_id: int) -> bool:
-    stmt = select(MyPost.post_id).where(MyPost.channel_id == context.channel_id).limit(1)
+    # 1. Получаем текущий last_post_id из ТВОЕЙ таблицы
+    stmt = select(MyChannel.last_post_id).where(MyChannel.channel_id == context.channel_id)
     result = await session.execute(stmt)
     last_post_id = result.scalar_one_or_none()
 
-    if last_post_id is not None and message_id <= last_post_id:
+    if last_post_id is None:
         return False
 
-    upsert_stmt = (
-        insert(MyPost)
-        .values(channel_id=context.channel_id, post_id=message_id)
-        .on_conflict_do_update(index_elements=[MyPost.channel_id], set_={"post_id": message_id})
+    if message_id <= last_post_id:
+        return False
+
+    # 2. Обновляем ID
+    update_stmt = (
+        update(MyChannel)
+        .where(MyChannel.channel_id == context.channel_id)
+        .values(last_post_id=message_id)
     )
-    await session.execute(upsert_stmt)
+    await session.execute(update_stmt)
     await session.commit()
     return True

@@ -25,7 +25,7 @@ from decimal import Decimal
 import app.handlers.keyboards as kb
 from app.handlers.keyboards import payment_button_keyboard
 from app.db.crud import get_or_create_user, closed_menu, create_pending_payment
-from app.db.models import User, MagazineChannel, ChannelState, Magazine, Payment, UserQuizProfile
+from app.db.models import User, Magazine, Payment, UserQuizProfile
 from app.db.config import session_maker
 from app.posting.resolver import resolve_channel_context
 from app.posting.state import is_new_post
@@ -797,43 +797,6 @@ async def process_payment(
         await callback.message.answer(
             "❌ Ошибка при создании платежа. Попробуйте позже."
         )
-
-
-
-
-
-# # Отправка сообщений из канала Mari
-#
-# @for_user_router.channel_post()
-# async def forward_post_to_users(message: Message, bot: Bot):
-#     if message.chat.id != channel:
-#         return
-#
-#     async with session_maker() as session:
-#         last_id = await get_last_post_id(session)
-#         if message.message_id <= last_id:
-#             return  # уже отправляли пост
-#
-#         # Получаем всех пользователей
-#         result = await session.execute(select(User.telegram_id))
-#         users = result.scalars().all()
-#
-#         for user_id in users:
-#             try:
-#                 await bot.forward_message(
-#                     chat_id=user_id,
-#                     from_chat_id=channel,
-#                     message_id=message.message_id,
-#                 )
-#             except Exception as e:
-#                 print(f"❌ Ошибка отправки пользователю {user_id}: {e}")
-#
-#         # Обновляем last_post_id
-#         await set_last_post_id(session, message.message_id)
-
-
-
-
 
 
 

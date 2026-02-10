@@ -15,6 +15,7 @@ load_dotenv(find_dotenv())
 
 from app.db.config import session_maker
 from app.middlewares.db_session import DataBaseSession
+from app.middlewares.old_updates import DropOldUpdatesMiddleware
 from app.handlers.for_user import for_user_router
 from app.handlers.for_quiz import quiz_router
 from app.comands_menu.bot_menu_cmds import bot_menu, menu_cmds_router
@@ -52,7 +53,7 @@ async def on_startup(dispatcher: Dispatcher):
     print("Bot started ▶️")
     await bot.set_webhook(
         url=WEBHOOK_URL,
-        drop_pending_updates=True,
+        drop_pending_updates=False,
         allowed_updates=["message", "edited_message", "callback_query", "inline_query", "chosen_inline_result",
                          "callback_query", "shipping_query", "pre_checkout_query", "poll", "poll_answer",
                          "my_chat_member", "chat_member", "chat_join_request", "channel_post", "edited_channel_post"]
@@ -77,9 +78,10 @@ async def on_shutdown(dispatcher: Dispatcher):
 
 
 async def main():
-    await bot.delete_webhook(drop_pending_updates=True)
+    await bot.delete_webhook(drop_pending_updates=False)
     dp.startup.register(on_startup)
     dp.shutdown.register(on_shutdown)
+    dp.update.outer_middleware(DropOldUpdatesMiddleware(limit_seconds=60)) # Middleware для постинга
     dp.update.middleware(DataBaseSession(session_pool=session_maker)) # Middleware сессии БД
     await bot.set_my_commands(commands=bot_menu, scope=types.BotCommandScopeAllPrivateChats())
     # await dp.start_polling(bot)

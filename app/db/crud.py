@@ -7,7 +7,7 @@ from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from openai import AsyncOpenAI
 
-from app.db.models import ChannelState, MagazineChannel, MyChannel, User, Payment
+from app.db.models import User, Payment
 from app.services.user_service import get_user_cached
 
 # Инициализируем OpenAI клиента один раз
@@ -132,7 +132,7 @@ async def activate_premium_subscription(session: AsyncSession, telegram_id: int,
     """
     Активирует полный доступ:
     1. Начисляет запросы
-    2. Привязывает к техническому магазину (ID 3)
+    2. Привязывает к техническому магазину (ID 1)
     3. Устанавливает промокод
     4. Открывает доступ к меню (снимает флаг)
     """
@@ -141,7 +141,7 @@ async def activate_premium_subscription(session: AsyncSession, telegram_id: int,
         .where(User.telegram_id == telegram_id)
         .values(
             requests_left=User.requests_left + count,
-            magazine_id=3,                 # Технический магазин
+            magazine_id=1,                 # Технический магазин
             promo_code='BABYKEA_PREMIUM',  # Спец код
             closed_menu_flag=False,        # 🔥 Снимаем флаг (даем доступ к меню)
             first_catalog_request=False    # 🔥 Снимаем флаг для первого ответа по поиску (что бы не было промо в ответе)

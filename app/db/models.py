@@ -60,7 +60,7 @@ class User(Base):
     )
     email: Mapped[str] = mapped_column(String(150), nullable=True)
     stroller_model: Mapped[str] = mapped_column(String(50), nullable=True)
-    stroller_condition: Mapped[str] = mapped_column(String(50), nullable=True)
+    # stroller_condition: Mapped[str] = mapped_column(String(50), nullable=True)
     requests_left: Mapped[int] = mapped_column(Integer, default=1)
     closed_menu_flag: Mapped[bool] = mapped_column(Boolean, default=True)
     first_catalog_request: Mapped[bool] = mapped_column(Boolean, default=True)
@@ -116,6 +116,7 @@ class MagazineChannel(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     magazine_id: Mapped[int] = mapped_column(ForeignKey("magazines.id", ondelete="CASCADE"), nullable=False)
     channel_id: Mapped[int] = mapped_column(BigInteger, unique=True, nullable=False)
+    last_post_id: Mapped[int] = mapped_column(Integer, default=0)
     is_active: Mapped[bool] = mapped_column(default=True)
 
 
@@ -144,20 +145,20 @@ class MyChannel(Base):
         unique=True,
         nullable=False
     )
-
+    last_post_id: Mapped[int] = mapped_column(Integer, default=0)
     is_active: Mapped[bool] = mapped_column(default=True)
 
 
 
 
-#7 Таблица номеров ПОСТОВ из МОЕГО ЛИЧНОГО канала. Сдесь будет id моего последнего поста
-class MyPost(Base):
-    __tablename__ = "my_posts"
-
-    id: Mapped[int] = mapped_column(primary_key=True)
-
-    channel_id: Mapped[int] = mapped_column(BigInteger, unique=True, nullable=False)
-    post_id: Mapped[int] = mapped_column(nullable=False)
+# #7 Таблица номеров ПОСТОВ из МОЕГО ЛИЧНОГО канала. Сдесь будет id моего последнего поста
+# class MyPost(Base):
+#     __tablename__ = "my_posts"
+#
+#     id: Mapped[int] = mapped_column(primary_key=True)
+#
+#     channel_id: Mapped[int] = mapped_column(BigInteger, unique=True, nullable=False)
+#     post_id: Mapped[int] = mapped_column(nullable=False)
 
 
 
