@@ -18,7 +18,8 @@ from app.middlewares.db_session import DataBaseSession
 from app.middlewares.old_updates import DropOldUpdatesMiddleware
 from app.handlers.for_user import for_user_router
 from app.handlers.for_quiz import quiz_router
-from app.comands_menu.bot_menu_cmds import bot_menu, menu_cmds_router
+from app.comands_menu.standard_cmds import bot_menu
+from app.comands_menu import menu_cmds_router
 from app.payments.payment_routes import yookassa_webhook_handler
 from app.redis_client import redis_client as redis
 

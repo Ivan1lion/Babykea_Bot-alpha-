@@ -42,48 +42,103 @@ async def check_url_status(session: aiohttp.ClientSession, url: str) -> bool:
         return False
 
 
+# async def validate_and_fix_links(text: str) -> str:
+#     """
+#     Находит все Markdown-ссылки в тексте, проверяет их.
+#     Если ссылка битая -> убирает URL, оставляя только название.
+#     """
+#     # Регулярка для поиска ссылок вида [Текст](https://...)
+#     # Группа 1: Текст, Группа 2: URL
+#     link_pattern = re.compile(r'\[([^\]]+)\]\((https?://[^\)]+)\)')
+#
+#     matches = link_pattern.findall(text)
+#     if not matches:
+#         return text  # Ссылок нет, возвращаем как есть
+#
+#     # Собираем уникальные ссылки для проверки
+#     unique_urls = list(set(url for _, url in matches))
+#
+#     # Асинхронно проверяем все ссылки разом
+#     async with aiohttp.ClientSession() as session:
+#         tasks = [check_url_status(session, url) for url in unique_urls]
+#         results = await asyncio.gather(*tasks)
+#
+#     # Создаем карту: URL -> Доступен (True/False)
+#     url_status = dict(zip(unique_urls, results))
+#
+#     # Функция замены для re.sub
+#     def replace_match(match):
+#         title = match.group(1)
+#         url = match.group(2)
+#
+#         if url_status.get(url, False):
+#             # Ссылка живая - оставляем как есть
+#             return f"[{title}]({url})"
+#         else:
+#             # Ссылка мертвая - оставляем только текст + пометку (или просто текст)
+#             # Вариант 1: "Anex Air-Z (ссылка не найдена)"
+#             # Вариант 2 (твой выбор): Просто "Anex Air-Z" (ссылка удаляется)
+#             return f"{title} (извините ссылка на товар не найдена)"
+#
+#             # Заменяем все вхождения в тексте
+#
+#     fixed_text = link_pattern.sub(replace_match, text)
+#     return fixed_text
+
 async def validate_and_fix_links(text: str) -> str:
     """
-    Находит все Markdown-ссылки в тексте, проверяет их.
-    Если ссылка битая -> убирает URL, оставляя только название.
+    Находит HTML-ссылки <a href="...">Текст</a>, проверяет их.
+    Если ссылка битая -> убирает тег <a>, оставляя только текст + пометку.
     """
-    # Регулярка для поиска ссылок вида [Текст](https://...)
-    # Группа 1: Текст, Группа 2: URL
-    link_pattern = re.compile(r'\[([^\]]+)\]\((https?://[^\)]+)\)')
+    # 1. Регулярка для HTML ссылок
+    # Группа 1: URL, Группа 2: Текст внутри тега
+    link_pattern = re.compile(r'<a\s+href=[\'"](https?://[^\'"]+)[\'"][^>]*>(.*?)</a>', re.IGNORECASE)
 
     matches = link_pattern.findall(text)
     if not matches:
-        return text  # Ссылок нет, возвращаем как есть
+        return text
 
-    # Собираем уникальные ссылки для проверки
-    unique_urls = list(set(url for _, url in matches))
+    # Собираем уникальные ссылки (URL - это первая группа)
+    unique_urls = list(set(url for url, _ in matches))
 
-    # Асинхронно проверяем все ссылки разом
+    # Асинхронно проверяем
     async with aiohttp.ClientSession() as session:
         tasks = [check_url_status(session, url) for url in unique_urls]
         results = await asyncio.gather(*tasks)
 
-    # Создаем карту: URL -> Доступен (True/False)
     url_status = dict(zip(unique_urls, results))
 
-    # Функция замены для re.sub
     def replace_match(match):
-        title = match.group(1)
-        url = match.group(2)
+        url = match.group(1)   # URL
+        title = match.group(2) # Текст ссылки (например, название коляски)
 
         if url_status.get(url, False):
-            # Ссылка живая - оставляем как есть
-            return f"[{title}]({url})"
+            # Ссылка живая - возвращаем как было
+            return f'<a href="{url}">{title}</a>'
         else:
-            # Ссылка мертвая - оставляем только текст + пометку (или просто текст)
-            # Вариант 1: "Anex Air-Z (ссылка не найдена)"
-            # Вариант 2 (твой выбор): Просто "Anex Air-Z" (ссылка удаляется)
-            return f"{title} (извините ссылка на товар не найдена)"
-
-            # Заменяем все вхождения в тексте
+            # Ссылка мертвая - убираем тег, оставляем текст
+            return f'{title} (ссылка не найдена)'
 
     fixed_text = link_pattern.sub(replace_match, text)
     return fixed_text
+
+
+def clean_markdown_artifacts(text: str) -> str:
+    """
+    Очищает текст от остатков Markdown, превращая их в HTML или красивые символы.
+    """
+    # 1. Жирный текст: **текст** -> <b>текст</b>
+    # Ищет двойные звездочки и заменяет на теги
+    text = re.sub(r'\*\*(.*?)\*\*', r'<b>\1</b>', text)
+
+    # 2. Заголовки Markdown: ## Текст -> <b>Текст</b>
+    text = re.sub(r'#{2,}\s*(.*?)$', r'<b>\1</b>', text, flags=re.MULTILINE)
+
+    # 3. Маркеры списков: * Текст или - Текст -> • Текст
+    # Telegram не поддерживает теги <ul><li>, поэтому меняем на красивый символ
+    text = re.sub(r'^\s*[\*\-]\s+', '• ', text, flags=re.MULTILINE)
+
+    return text
 
 
 # ==========================================
@@ -117,7 +172,7 @@ async def ask_responses_api(user_message: str, system_instruction: str) -> str:
         # Если Google думает дольше - бросаем ошибку и идем к OpenAI
         response = await asyncio.wait_for(
             google_client.aio.models.generate_content(
-                model="gemini-2.0-flash",  # Исправил имя модели на стабильное
+                model="gemini-3-flash-preview",
                 contents=user_message,
                 config=generate_config
             ),
@@ -147,7 +202,7 @@ async def ask_responses_api(user_message: str, system_instruction: str) -> str:
                 model="gpt-5.2",
                 messages=messages,
                 reasoning={"effort": "high"},
-                timeout=60.0  # Таймаут 30 секунд
+                timeout=60.0  # Таймаут 60 секунд
             )
             raw_answer = response.choices[0].message.content or ""
 
@@ -157,8 +212,12 @@ async def ask_responses_api(user_message: str, system_instruction: str) -> str:
 
     # --- 3. ПОСТ-ВАЛИДАЦИЯ ССЫЛОК (LEVEL 3) ---
     if raw_answer:
-        # logger.info("🔍 Проверка ссылок на валидность...")
-        final_answer = await validate_and_fix_links(raw_answer)
+        # 1. 🔥 Сначала чистим от Markdown-артефактов (звездочек)
+        clean_answer = clean_markdown_artifacts(raw_answer)
+
+        # 2. Потом проверяем HTML-ссылки на валидность в уже чистом тексте
+        final_answer = await validate_and_fix_links(clean_answer)
+
         return final_answer
 
     return "Не удалось получить ответ."
