@@ -333,7 +333,7 @@ QUIZ_CONFIG = {
                 "pregnant": {
                     "button": "Коляска от рождения 0+",
                     "preview": {
-                        "photo": "AgACAgIAAyEGAATQjmD4AANkaY3zemJziqBH28hD4L4tLMT9x_wAAmAaaxs1a3FIYBBWA7e3Yx0BAAMCAAN5AAM6B",
+                        "photo": "AgACAgIAAyEGAATQjmD4AANkaY3zemJziqBH28hD4L4tLMT9x_wAAmAaaxs1a3FIYBBWA7e3Yx0BAAMCAAN5AAM6BA",
                         "text": "<blockquote>Коляски с люлькой + прогулочный блок и автолюлька (в зависимости от "
                                 "комплектации)</blockquote>"
                     },
