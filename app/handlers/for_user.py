@@ -50,7 +50,7 @@ class ActivationState(StatesGroup):
     waiting_for_promo_code = State()
 
 class AIChat(StatesGroup):
-    catalog_mode = State()  # Режим подбора (работает Pinecone / Feed)
+    catalog_mode = State()  # Режим подбора (работает векторная БД)
     info_mode = State()     # Режим вопросов (работает Google Search / Общие знания)
 
 

@@ -1,19 +1,19 @@
 import os
 import asyncio
-from decimal import Decimal
-from aiogram import Bot
+# from decimal import Decimal
+# from aiogram import Bot
 from aiogram.types import Message
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
-from openai import AsyncOpenAI
+# from openai import AsyncOpenAI
 
 from app.db.models import User, Payment
 from app.services.user_service import get_user_cached
 
-# Инициализируем OpenAI клиента один раз
-client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-# для постинга
-channel = int(os.getenv("CHANNEL_ID"))
+# # Инициализируем OpenAI клиента один раз
+# client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+# # для постинга
+# channel = int(os.getenv("CHANNEL_ID"))
 
 
 

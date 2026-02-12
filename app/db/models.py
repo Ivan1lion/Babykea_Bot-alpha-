@@ -151,19 +151,10 @@ class MyChannel(Base):
 
 
 
-# #7 Таблица номеров ПОСТОВ из МОЕГО ЛИЧНОГО канала. Сдесь будет id моего последнего поста
-# class MyPost(Base):
-#     __tablename__ = "my_posts"
-#
-#     id: Mapped[int] = mapped_column(primary_key=True)
-#
-#     channel_id: Mapped[int] = mapped_column(BigInteger, unique=True, nullable=False)
-#     post_id: Mapped[int] = mapped_column(nullable=False)
 
 
 
-
-#8 🔥 Технический канал (для загрузки файлов в Redis)
+#7 🔥 Технический канал (для загрузки файлов в Redis)
 class TechChannel(Base):
     __tablename__ = "tech_channels"
 
@@ -174,7 +165,7 @@ class TechChannel(Base):
 
 
 
-#9 Таблица оплаты для решения дублей webhook
+#8 Таблица оплаты для решения дублей webhook
 class Payment(Base):
     __tablename__ = "payments"
 
@@ -182,7 +173,7 @@ class Payment(Base):
 
     payment_id: Mapped[str] = mapped_column(String(64), unique=True, index=True)
 
-    telegram_id: Mapped[int] = mapped_column(index=True)
+    telegram_id: Mapped[int] = mapped_column(BigInteger, index=True)
 
     amount: Mapped[Decimal] = mapped_column(Numeric(10, 2))
 
