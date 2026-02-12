@@ -44,7 +44,7 @@ from app.redis_client import redis_client
 logger = logging.getLogger(__name__)
 for_user_router = Router()
 
-# channel = int(os.getenv("CHANNEL_ID"))
+tech_channel_id = int(os.getenv("TECH_CHANNEL_ID"))
 
 class ActivationState(StatesGroup):
     waiting_for_promo_code = State()
@@ -83,7 +83,7 @@ async def cmd_start(message: Message, bot: Bot, session: AsyncSession):
     try:
         await bot.copy_message(
             chat_id=message.chat.id,
-            from_chat_id=-1003498991864, # ID группы
+            from_chat_id=tech_channel_id, # ID тех канала
             message_id=28,  # ID сообщения из группы
             reply_markup=kb.quiz_start
         )
@@ -614,8 +614,8 @@ async def handle_no_state(message: Message, bot:Bot, session: AsyncSession):
         try:
             await bot.copy_message(
                 chat_id=message.chat.id,
-                from_chat_id=-1003498991864,  # ID группы
-                message_id=4,  # ID сообщения из группы
+                from_chat_id=tech_channel_id,  # ID группы
+                message_id=35,  # ID сообщения из группы
             )
             await asyncio.sleep(1)
             await message.answer(

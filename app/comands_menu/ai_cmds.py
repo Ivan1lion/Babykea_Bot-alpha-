@@ -19,6 +19,8 @@ from app.services.user_service import get_user_cached, update_user_flags
 ai_router = Router()
 logger = logging.getLogger(__name__)
 
+tech_channel_id = int(os.getenv("TECH_CHANNEL_ID"))
+
 @ai_router.message(Command("ai_consultant"))
 async def cmd_ai_consultant(message: Message, bot:Bot, session: AsyncSession):
     if await closed_menu(message=message, session=session):
@@ -61,8 +63,8 @@ async def cmd_ai_consultant(message: Message, bot:Bot, session: AsyncSession):
         try:
             await bot.copy_message(
                 chat_id=message.chat.id,
-                from_chat_id=-1003498991864,  # ID группы
-                message_id=28,  # ID сообщения из группы
+                from_chat_id=tech_channel_id,  # ID группы
+                message_id=35,  # ID сообщения из группы
             )
             await asyncio.sleep(1)
             await message.answer(

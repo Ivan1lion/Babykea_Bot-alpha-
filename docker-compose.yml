@@ -67,3 +67,10 @@ volumes:
 networks:
   bot_net:
     driver: bridge
+
+
+#redis:
+#    image: redis:alpine
+#    command: redis-server --appendonly yes  # 👈 Включает сохранение на диск
+#    volumes:
+#      - redis_data:/data

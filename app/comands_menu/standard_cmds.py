@@ -24,9 +24,6 @@ bot_menu = [
 
 
 
-
-
-
 @standard_router.message(Command("blog"))
 async def blog_cmd(message: Message, bot: Bot, session: AsyncSession):
 
@@ -39,16 +36,6 @@ async def blog_cmd(message: Message, bot: Bot, session: AsyncSession):
         message_id=7  # ID сообщения из группы
     )
 
-
-
-@standard_router.message(Command("help"))
-async def help_cmd(message: Message, session: AsyncSession):
-
-    if await closed_menu(message=message, session=session):
-        return
-
-    await message.answer(f" 1. Ответы на частые вопросы"
-                         )
 
 
 
