@@ -1,208 +1,54 @@
-Квиз = дерево
-start
- ├── pregnant
- │    ├── level_2
- │    └── level_3
- ├── stroller_6_plus
- │    ├── level_2
- │    └── level_3
- └── service_only
-      ├── level_2
+==============================
+ГОТОВЫЙ СЛОВАРЬ ДЛЯ КОНФИГА:
+==============================
 
-app/
-  └── quiz/
-        └── config.py
+    "0.jpg": "AgACAgIAAyEGAATQjmD4AAMvaY3x9txJDGU92xxqUpE6fVmWLWAAAjAaaxs1a3FIdL4SDY-JOfEBAAMCAAN3AAM6BA",
+    "10.jpg": "AgACAgIAAyEGAATQjmD4AAMwaY3x9ytgovP1FhT2PkyhLaR3SzcAAjEaaxs1a3FIY5WBdMw_ZC4BAAMCAAN4AAM6BA",
+    "20.jpg": "AgACAgIAAyEGAATQjmD4AANBaY3yEN8yRGr1pw6Iif2GG6kzu_cAAkYaaxs1a3FIifXXHzgRtFwBAAMCAAN5AAM6BA",
+    "30.jpg": "AgACAgIAAyEGAATQjmD4AANiaY3zcXFihPhBRbPWDa8wqzkDxlUAAl0aaxs1a3FI4i0P_3fweB8BAAMCAAN3AAM6BA",
 
-QUIZ_CONFIG = {
-...
-🧠 ЧТО ТУТ ВАЖНО ПОНЯТЬ
-1️⃣ root — всегда один
-1.	первый уровень
-2.	выбирает ветку
-3.	записывает user_type
-4.	не меняет уровень, пока не нажали «Далее»
+    "110.jpg": "AgACAgIAAyEGAATQjmD4AAMxaY3x-YpLJ9x7whlJqSrC-hyck9AAAjIaaxs1a3FITurutAMtoygBAAMCAAN5AAM6BA",
+    "111.jpg": "AgACAgIAAyEGAATQjmD4AAMyaY3x-kSWHyMhTcRVXBIneuBrpIUAAjMaaxs1a3FI-hCh2jNPNd0BAAMCAAN5AAM6BA",
+    "112.png": "AgACAgIAAyEGAATQjmD4AAMzaY3x_KKhQAUxilkjzFJJaMwKgBMAAjQaaxs1a3FI2oB2IJw2YI4BAAMCAAN3AAM6BA",
+    "113.jpg": "AgACAgIAAyEGAATQjmD4AAM0aY3x_ZoDEiVg7wmsVcTINCHHmxMAAjUaaxs1a3FINk_VHpEC0bkBAAMCAAN5AAM6BA",
+    "120.jpg": "AgACAgIAAyEGAATQjmD4AAM1aY3x_2Wdbs466FjLS3XiNXTubKQAAjYaaxs1a3FIaq52Pae7gDABAAMCAAN5AAM6BA",
+    "121.jpg": "AgACAgIAAyEGAATQjmD4AAM2aY3yAWqPeseKiRln1PGIU-C9Nm8AAjcaaxs1a3FIek_4iERds5gBAAMCAAN5AAM6BA",
+    "122.jpg": "AgACAgIAAyEGAATQjmD4AAM3aY3yAhM0HyEJWb66mvXtYrt2UigAAjgaaxs1a3FIb1rvJJeCmCoBAAMCAAN5AAM6BA",
+    "130.jpg": "AgACAgIAAyEGAATQjmD4AAM4aY3yA8DOTh8ldStWJcOVgZoPoj4AAjkaaxs1a3FIYaEHhQ0-e4wBAAMCAAN5AAM6BA",
+    "131.jpg": "AgACAgIAAyEGAATQjmD4AAM5aY3yBc5jOruf7bvxM_cxTVUZQlUAAjoaaxs1a3FItbfEllENgVgBAAMCAAN3AAM6BA",
+    "132.jpg": "AgACAgIAAyEGAATQjmD4AAM6aY3yBsAQRMni9fIZgshk4XlMLowAAjsaaxs1a3FI15_guEobOEQBAAMCAAN3AAM6BA",
+    "133.jpg": "AgACAgIAAyEGAATQjmD4AAM7aY3yCM61_230v20FHHjUFss5btEAAjwaaxs1a3FIGEbsM1aEMfYBAAMCAAN5AAM6BA",
+    "140.jpg": "AgACAgIAAyEGAATQjmD4AAM8aY3yCbcJw4TSLtNk7lha0FH104wAAj4aaxs1a3FIzUbTJvbHot8BAAMCAAN5AAM6BA",
+    "141.jpg": "AgACAgIAAyEGAATQjmD4AAM9aY3yCyUC59bnljC1S1vpwAvy53MAAkEaaxs1a3FIY7A1AWYv7yQBAAMCAAN5AAM6BA",
+    "142.jpg": "AgACAgIAAyEGAATQjmD4AAM-aY3yDBM1D04AAZOF9_oQprto-mObAAJCGmsbNWtxSDm04SP1PpN-AQADAgADeQADOgQ",
+    "143.jpg": "AgACAgIAAyEGAATQjmD4AAM_aY3yDegV0x2c-L0SYCScMgfmEKIAAkMaaxs1a3FIW4y95QyQ1ToBAAMCAAN4AAM6BA",
+    "144.jpg": "AgACAgIAAyEGAATQjmD4AANAaY3yD3IUN11IpyPh923qCMxa_ygAAkQaaxs1a3FIqGXFwXqyI2ABAAMCAAN5AAM6BA",
 
-2️⃣ options
-Это НЕ ответы, а варианты выбора
-Каждый вариант:
-1.	имеет кнопку
-2.	имеет preview (фото + текст)
-3.	имеет save (что записать при «Далее»)
+    "210.jpg": "AgACAgIAAyEGAATQjmD4AANCaY3yEgbebJDYRr4HPO0N6eGNnlIAAkcaaxs1a3FIt9-5i4Mr3V0BAAMCAAN3AAM6BA",
+    "211.jpg": "AgACAgIAAyEGAATQjmD4AANXaY3zQDUc9Vp5VYK4wP2GiDoXd8YAAlAaaxs1a3FI-QdXgKw__xkBAAMCAAN5AAM6BA",
+    "212.png": "AgACAgIAAyEGAATQjmD4AANYaY3zRW_bh9wZ6YywwhDKosvnUDUAAlEaaxs1a3FI1VdEMYK3uOYBAAMCAAN5AAM6BA",
+    "213.jpg": "AgACAgIAAyEGAATQjmD4AANZaY3zSaZHDn2H4fSpA_R3UEi__qYAAlMaaxs1a3FIeIZJhd0wy4IBAAMCAAN3AAM6BA",
+    "220.jpg": "AgACAgIAAyEGAATQjmD4AANaaY3zTa4Kce9brIdF5N-Js2BbHTIAAlQaaxs1a3FIwddwsaIS-TMBAAMCAAN4AAM6BA",
+    "221.jpg": "AgACAgIAAyEGAATQjmD4AANbaY3zUlXklRMJZWvqq4c90eWDPc4AAlUaaxs1a3FISkRBxSBhtvMBAAMCAAN3AAM6BA",
+    "222.jpg": "AgACAgIAAyEGAATQjmD4AANcaY3zVv78jHzQgfmwFrESMrVzedgAAlYaaxs1a3FIeZ_irTprIk0BAAMCAAN3AAM6BA",
+    "230.jpg": "AgACAgIAAyEGAATQjmD4AANdaY3zW-AFGO21fC4d15csOVL3BHIAAlgaaxs1a3FIFjy4-hyYI_EBAAMCAAN4AAM6BA",
+    "231.jpg": "AgACAgIAAyEGAATQjmD4AANeaY3zX3aNbYk_O2fDFymDYjzCIjcAAlkaaxs1a3FIuFyvImOT9eMBAAMCAAN4AAM6BA",
+    "232.jpg": "AgACAgIAAyEGAATQjmD4AANfaY3zZNnapFS6i2A3ipIEo2TVN-QAAloaaxs1a3FIbim6PjmbSc4BAAMCAAN5AAM6BA",
+    "233.jpg": "AgACAgIAAyEGAATQjmD4AANgaY3zaKxKAi9qVdvjIDlobeTxbJAAAlsaaxs1a3FIz7rliU9t_kgBAAMCAAN3AAM6BA",
+    "234.jpg": "AgACAgIAAyEGAATQjmD4AANhaY3zbYUqjJdARhS5n24dffj45tgAAlwaaxs1a3FI8pklH_0CD1cBAAMCAAN3AAM6BA",
 
-3️⃣ preview
-Используется:
-1.	когда пользователь нажал кнопку
-2.	НО НЕ НАЖАЛ «Далее»
-👉 данные НЕ сохраняются
+    "310.jpg": "AgACAgIAAyEGAATQjmD4AANjaY3zdho5oBpYaP3tIWb1JIn5cZoAAl4aaxs1a3FI6b9kzsHXQSYBAAMCAAN5AAM6BA",
+    "311.jpg": "AgACAgIAAyEGAATQjmD4AANkaY3zemJziqBH28hD4L4tLMT9x_wAAmAaaxs1a3FIYBBWA7e3Yx0BAAMCAAN5AAM6BA",
+    "312.jpg": "AgACAgIAAyEGAATQjmD4AANlaY3zf9S_f1ESGC8pG4-gXulPUboAAmEaaxs1a3FIV2yfDE4QZ2UBAAMCAAN4AAM6BA",
 
-4️⃣ save
-Используется:
-1.	ТОЛЬКО при «Далее»
-2.	записывается в user_quiz_profile.data
-3.	иногда — в users (например user_type)
-
-5️⃣ branch
-1.	записывается один раз
-2.	определяет, какой раздел конфига использовать дальше
-
-6️⃣ next_level
-1.	увеличивает current_level
-2.	используется FSM / профиль
-
-🔐 ВАЛИДАЦИЯ «ДАЛЕЕ»
-Логика будет такой (позже в коде):
-если нет выбранного option → ошибка
-👉 Конфиг не разрешает двигаться дальше без выбора
-
-🔙 КНОПКА «НАЗАД»
-Конфиг НЕ содержит логику назад
-Назад = current_level - 1
-1.	очистка последнего ключа в data
-
-🔄 ВОССТАНОВЛЕНИЕ ПОСЛЕ РЕСТАРТА
-По данным из БД:
-branch + current_level
-мы:
-1.	читаем нужный кусок конфига
-2.	рендерим правильный UI
+    "напишите мастеру.jpg": "AgACAgIAAyEGAATQjmD4AANmaY3zgyO2OZEYDqhTgnTnvnU95ssAAmIaaxs1a3FIgRucNIuBL00BAAMCAAN5AAM6BA",
+    "При оплате.jpg": "AgACAgIAAyEGAATQjmD4AANnaY3ziPd3A8eUTwbZqo6-aqCuxmYAAmQaaxs1a3FI56_9NYQIxA0BAAMCAAN5AAM6BA",
+    гиф завершения квиза -> CgACAgQAAxkBAAIxe2liVpUmUuaoAAEWiAq4dZsc4CTygQACBAMAAvYbHVNpZ9ehQ-1QTjgE
 
 
 
-1️⃣ Структура шага
-
-"level": 1,
-"photo": "photo_1",                        # фото по умолчанию для шага
-"text": "Выберите верное утверждение:",    # текст по умолчанию
-"options": {                               # кнопки варианта выбора
-    "pregnant": {
-        "button": "🤰 Я в положении",       # текст кнопки
-        "preview": {                       # фото и текст после выбора этой кнопки
-            "photo": "photo_2",
-            "text": "Коляски для новорожденных..."
-        },
-        "branch": "pregnant",               # ветка на следующий уровень
-        "save": {                           # что сохраняем в profile.data при выборе
-            "user_type": "group_1"
-        }
-    },
-    ...
-},
-"next_level": 2                            # номер следующего уровня
 
 
-photo — используется до выбора пользователем кнопки.
-preview — используется после того, как пользователь нажал кнопку, для рендеринга нового фото и текста.
-branch — определяет, в какую ветку пользователь пойдёт на следующем уровне.
-save — ключи и значения, которые записываются в UserQuizProfile.data.
-
-Как добавлять новые фото:
-
-Добавляешь шаг с "photo" для изображения по умолчанию.
-Для каждой кнопки указываешь "preview" с нужным фото и текстом.
-Если нужно сохранять данные в UserQuizProfile, указываешь "save".
-Если шаг ведёт в новую ветку, указываешь "branch".
-Пример добавления третьего уровня:
-
-"pregnant": {
-    3: {
-        "photo": "photo_8",
-        "text": "Выберите цвет коляски",
-        "options": {
-            "red": {
-                "button": "Красная",
-                "preview": {"photo": "photo_9", "text": "Красная коляска"},
-                "save": {"color": "red"}
-            },
-            "blue": {
-                "button": "Синяя",
-                "preview": {"photo": "photo_10", "text": "Синяя коляска"},
-                "save": {"color": "blue"}
-            }
-        },
-        "next_level": 4
-    }
-}
-
-Важные моменты:
-
-Всегда добавляй "photo" в шаг, иначе resolve_media упадёт.
-"preview" опционален, но нужен, если фото меняется после выбора.
-"save" — это что сохраняем в БД. Можно один ключ или несколько.
-"branch" нужен только на первом шаге, чтобы определить ветку.
-
-QUIZ_CONFIG = {
-    "root": {
-        "level": 1,
-        "photo": "photo_1",
-        "text": "Выберите верное утверждение:",
-        "options": {
-            "pregnant": {
-                "button": "🤰 Я в положении",
-                "preview": {
-                    "photo": "photo_2",
-                    "text": "Коляски для новорожденных..."
-                },
-                "branch": "pregnant",
-                "save": {
-                    "user_type": "group_1"
-                }
-            },
-            "stroller_6_plus": {
-                "button": "👶 Прогулочная коляска 6+",
-                "preview": {
-                    "photo": "photo_3",
-                    "text": "Коляски для детей от 6 мес..."
-                },
-                "branch": "stroller_6_plus",
-                "save": {
-                    "user_type": "group_2"
-                }
-            },
-            "service_only": {
-                "button": "🛠 Коляска уже есть",
-                "preview": {
-                    "photo": "photo_4",
-                    "text": "Обслуживание колясок..."
-                },
-                "branch": "service_only",
-                "save": {
-                    "user_type": "group_2"
-                }
-            },
-        },
-        "next_level": 2
-    },
-
-    "pregnant": {
-        2: {
-            "photo": "photo_5",
-            "text": "Сфера применения коляски",
-            "options": {
-                "daily": {
-                    "button": "Для ежедневных прогулок",
-                    "preview": {
-                        "photo": "photo_6",
-                        "text": "Для ежедневных прогулок"
-                    },
-                    "save": {
-                        "usage": "daily_walks"
-                    }
-                },
-                "travel": {
-                    "button": "Для путешествий",
-                    "preview": {
-                        "photo": "photo_7",
-                        "text": "Для перелётов"
-                    },
-                    "save": {
-                        "usage": "travel"
-                    }
-                }
-            },
-            "next_level": 3
-        }
-    }
-}
 
 
 
@@ -242,10 +88,4 @@ QUIZ_CONFIG = {
 310.jpg -> AgACAgIAAxkDAAIxGGlhIFRJHrc-Wp_og1wU4y0KryrOAAJ2C2sbEv8QS5o0-r_wkpX_AQADAgADeQADOAQ
 311.jpg -> AgACAgIAAxkDAAIxO2lhIlWf8p-CjgpfYKI6nTY9gi-vAAKdC2sbEv8QS1adHAflDG6xAQADAgADeQADOAQ
 312.jpg -> AgACAgIAAxkDAAIxGmlhIFXxO8sdL1t5ysb7M9yRAWULAAJ4C2sbEv8QS0rXGIJ6uqGJAQADAgADeAADOAQ
-video.mp4 -> AgACAgIAAxkDAAIxG2lhIGY0e7z2cwjET_DULygAARcTIAACeQtrGxL_EEu3qpkOzJtvQgEAAwIAA3gAAzgE
-гиф завершения квиза -> CgACAgQAAxkBAAIxe2liVpUmUuaoAAEWiAq4dZsc4CTygQACBAMAAvYbHVNpZ9ehQ-1QTjgE
-
-
-
-
 

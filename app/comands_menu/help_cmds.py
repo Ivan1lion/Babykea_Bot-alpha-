@@ -171,7 +171,7 @@ async def process_contact_master(callback: CallbackQuery, session: AsyncSession)
     # Отправляем сообщение с кнопкой-ссылкой
     # (Мы не можем просто перекинуть юзера, нужно дать ему кнопку для перехода)
     await callback.message.answer_photo(
-        photo="AgACAgIAAxkDAAIxGmlhIFXxO8sdL1t5ysb7M9yRAWULAAJ4C2sbEv8QS0rXGIJ6uqGJAQADAgADeAADOAQ",
+        photo="AgACAgIAAyEGAATQjmD4AANmaY3zgyO2OZEYDqhTgnTnvnU95ssAAmIaaxs1a3FIgRucNIuBL00BAAMCAAN5AAM6BA",
         caption="✅ <b>Пришлите мне пожалуйста короткое видео (5-10 сек) и опишите или проговорите в самом видео "
                 "суть Вашего вопроса</b>"
                 "\n\nЯ стараюсь всем кто пишет мне в ЛС ответить и помочь, но не всегда могу сделать это оперативно. Как "

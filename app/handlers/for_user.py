@@ -130,7 +130,7 @@ async def activation(call: CallbackQuery):
     await call.message.edit_reply_markup(reply_markup=None)
 
     await call.message.answer_photo(
-        photo="https://i.postimg.cc/15Qn287s/Безымянный.jpg",
+        photo="AgACAgIAAyEGAATQjmD4AANnaY3ziPd3A8eUTwbZqo6-aqCuxmYAAmQaaxs1a3FI56_9NYQIxA0BAAMCAAN5AAM6BA",
         caption="<b>Оплатите полный доступ ко всем разделам за 1900₽</b> "
         "\n<i>(В пакет также включены 50 бесплатных запросов к AI-консультанту)</i>"
         "\n\n<blockquote>🎫 <b>Есть флаер от магазина-партнера?</b>  — нажмите «Ввести код активации» для свободного "
