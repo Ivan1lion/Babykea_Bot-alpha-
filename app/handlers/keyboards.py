@@ -9,7 +9,7 @@ quiz_start = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="�
 
 #Перезапуск квиз-формы в случае ошибки
 quiz_false = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="🔄 Перезапуск",
-                                                                         callback_data="quiz:start")]])
+                                                                         callback_data="quiz:restore")]])
 
 
 

@@ -30,26 +30,31 @@ async def quiz_start(
     bot: Bot,
     session: AsyncSession,
 ):
+    # 1. Сразу отвечаем на колбэк
     await call.answer()
+
+    # 2. Получаем пользователя
     user = await get_or_create_user(
         session=session,
         telegram_id=call.from_user.id,
         username=call.from_user.username,
     )
+
+    # 3. Получаем профиль
     profile = await get_or_create_quiz_profile(session, user)
 
-    # очищаем только временный выбор
-    profile.data.pop("_selected", None)
+    # 🔥 ИСПРАВЛЕНИЕ: ПРИНУДИТЕЛЬНЫЙ СБРОС ПРОГРЕССА
+    # Так как мы запускаем квиз с "Главного меню", мы должны обнулить всё старое
+    profile.branch = None
+    profile.current_level = 1
+    profile.completed = False
+    profile.completed_once = False
+    profile.data = {}  # Очищаем все сохраненные ответы
+
+    # Сохраняем "чистый" профиль в БД
     session.add(profile)
     await session.commit()
 
-    # # Удаляем предыдущее сообщение с видео и кнопкой (если нужно)
-    # try:
-    #     await bot.delete_message(chat_id=call.message.chat.id, message_id=call.message.message_id)
-    # except Exception as e:
-    #     print(f"Не удалось удалить старое сообщение: {e}")
-
-    # Убираем кнопки из старого видео
     try:
         await bot.edit_message_reply_markup(
             chat_id=call.message.chat.id,
@@ -264,3 +269,47 @@ async def restart_quiz_cmd(
         reply_markup=build_keyboard(step, profile, None)
     )
 
+
+# Этот код срабатывает ТОЛЬКО при нажатии кнопки восстановления после ошибки
+@quiz_router.callback_query(F.data == "quiz:restore")
+async def quiz_restore_session(call: CallbackQuery, bot: Bot, session: AsyncSession):
+    await call.answer()
+
+    # 1. Получаем профиль (как есть, без изменений!)
+    user = await get_or_create_user(session, call.from_user.id, call.from_user.username)
+    profile = await get_or_create_quiz_profile(session, user)
+
+    # 2. Удаляем сообщение с ошибкой (на котором была кнопка)
+    try:
+        await call.message.delete()
+    except:
+        pass
+
+    # 3. Просто рендерим ТЕКУЩИЙ шаг заново
+    # Берем данные из профиля, который мы НЕ обнуляли
+    branch = profile.branch or "root"
+    current_level = profile.current_level
+
+    # Защита от несуществующего уровня
+    try:
+        step = QUIZ_CONFIG[branch][current_level]
+    except KeyError:
+        # Если вдруг уровень сломан — вот тогда сбрасываем
+        profile.current_level = 1
+        await session.commit()
+        step = QUIZ_CONFIG["root"][1]
+
+    photo, text = resolve_media(step, None)
+
+    # Отправляем НОВОЕ сообщение (так как старое редактировать не вышло)
+    msg = await bot.send_photo(
+        chat_id=call.message.chat.id,
+        photo=photo,
+        caption=text,
+        reply_markup=build_keyboard(step, profile, None)
+    )
+
+    # Обновляем ID сообщения в базе
+    profile.quiz_message_id = msg.message_id
+    session.add(profile)
+    await session.commit()

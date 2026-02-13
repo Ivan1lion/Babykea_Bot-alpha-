@@ -109,7 +109,7 @@ class UserQuizProfile(Base):
 
 
 
-#4 Таблица для постинга. Каналы магазинов (2+ на магазин)
+#4 Таблица для постинга. Каналы магазинов
 class MagazineChannel(Base):
     __tablename__ = "magazine_channels"
 
@@ -122,19 +122,10 @@ class MagazineChannel(Base):
 
 
 
-#5 Таблица для постинга. Посты из каналов магазинов
-class ChannelState(Base):
-    __tablename__ = "channel_states"
-
-    id: Mapped[int] = mapped_column(primary_key=True)
-    channel_id: Mapped[int] = mapped_column(BigInteger, nullable=False, unique=True, index=True)
-    post_id: Mapped[int] = mapped_column(nullable=False)
-    magazine_id: Mapped[int] = mapped_column(ForeignKey("magazines.id"), nullable=False)
 
 
 
-
-#6 Таблица для постинга из МОЕГО ЛИЧНОГО канала. Сдесь будет id моего канала
+#5 Таблица для постинга из МОЕГО ЛИЧНОГО канала. Сдесь будет id моего канала
 class MyChannel(Base):
     __tablename__ = "my_channels"
 
@@ -154,7 +145,7 @@ class MyChannel(Base):
 
 
 
-#7 🔥 Технический канал (для загрузки файлов в Redis)
+#6 🔥 Технический канал (для загрузки файлов в Redis)
 class TechChannel(Base):
     __tablename__ = "tech_channels"
 
@@ -165,7 +156,7 @@ class TechChannel(Base):
 
 
 
-#8 Таблица оплаты для решения дублей webhook
+#7 Таблица оплаты для решения дублей webhook
 class Payment(Base):
     __tablename__ = "payments"
 

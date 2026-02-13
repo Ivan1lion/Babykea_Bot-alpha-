@@ -186,7 +186,7 @@ QUIZ_CONFIG = {
                         "text": "<blockquote>Детская коляска подходящая для передвижения по грунту, асфальту "
                                 "или плитке. Обладает средним размером колёс и неплохой системой амортизации</blockquote>"
                     },
-                    "save": {"road_conditions": ["ground and asphalt"]}
+                    "save": {"road_conditions": "ground and asphalt"}
                 },
                 "offroad": {
                     "button": "Off-road",
@@ -284,7 +284,7 @@ QUIZ_CONFIG = {
                         "text": "<blockquote>Детская коляска подходящая для передвижения по грунту. Большие колёса, "
                                 "крепкая рама - если живёте за городом</blockquote>"
                     },
-                    "save": {"road_conditions": ["ground", "soil"]}
+                    "save": {"road_conditions": "ground"}
                 },
                 "asphalt": {
                     "button": "Аcфальт",
@@ -302,7 +302,7 @@ QUIZ_CONFIG = {
                         "text": "<blockquote>Детская коляска подходящая для передвижения по грунту, асфальту "
                                 "или плитке. Обладает средним размером колёс и неплохой системой амортизации</blockquote>"
                     },
-                    "save": {"road_conditions": ["soil", "asphalt"]}
+                    "save": {"road_conditions": "ground and asphalt"}
                 },
                 "offroad": {
                     "button": "Off-road",
@@ -313,7 +313,7 @@ QUIZ_CONFIG = {
                                 "и достаточно тяжелы. Но если нужно уходить от погони по снегу – это идеальный вариант. "
                                 "Выбор родителей из северных регионов</blockquote>"
                     },
-                    "save": {"road_conditions": ["offroad", "snow"]}
+                    "save": {"road_conditions": "offroad and snow"}
                 }
             },
             "next_level": None

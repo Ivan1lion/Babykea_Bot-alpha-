@@ -79,13 +79,26 @@ async def get_query_embedding(text: str) -> List[float]:
 def translate_quiz_to_text(quiz_data: dict) -> str:
     """Превращает JSON квиза в поисковую строку на русском."""
     search_terms = []
+
     for key, value in quiz_data.items():
-        if value in QUIZ_TRANSLATIONS:
-            search_terms.append(QUIZ_TRANSLATIONS[value])
+        # 1. Если пришел СПИСОК (например: ["ground", "asphalt"])
+        if isinstance(value, list):
+            for item in value:
+                # Пробуем перевести каждый элемент списка
+                # .get(item, item) вернет перевод, если он есть, или сам item, если нет
+                term = QUIZ_TRANSLATIONS.get(item, str(item))
+                search_terms.append(term)
+
+        # 2. Если пришла СТРОКА (например: "winter")
+        elif isinstance(value, str):
+            # Пробуем перевести строку
+            term = QUIZ_TRANSLATIONS.get(value, value)
+            search_terms.append(term)
+
+        # 3. (Опционально) Если перевода значения нет, но есть перевод ключа
         elif key in QUIZ_TRANSLATIONS:
             search_terms.append(QUIZ_TRANSLATIONS[key])
-        elif isinstance(value, str):
-            search_terms.append(value)
+
     return " ".join(search_terms)
 
 

@@ -69,17 +69,6 @@ class MagazineChannel(Base):
 
 
 
-#5 Таблица для постинга. Посты из каналов магазинов (журнал)
-class ChannelState(Base):
-    __tablename__ = "channel_states"
-
-    id: Mapped[int] = mapped_column(primary_key=True)
-
-    channel_id:      Telegram ID канала
-    post_id:         номер (id) поста в канале
-    magazine_id:     магазин, к которому относится пост ForeignKey("magazines.id")
-
-
 
 
 #6 Таблица для постинга из МОЕГО ЛИЧНОГО канала. Здесь будет id моего канала
@@ -93,13 +82,6 @@ class MyChannel(Base):
 
 
 
-#7 Таблица номеров ПОСТОВ из МОЕГО ЛИЧНОГО канала. Здесь будет id моего последнего поста
-class MyPost(Base):
-    __tablename__ = "my_posts"
 
-    id: Mapped[int] = mapped_column(primary_key=True)
-
-    channel_id:    Telegram ID канала
-    post_id:       номер (id) поста в канале
 
 
