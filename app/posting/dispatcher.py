@@ -12,9 +12,19 @@ from app.posting.media_cache import cache_media_from_post
 
 async def dispatch_post(context: PostingContext, message: Message, bot: Bot) -> None:
     # СЦЕНАРИЙ 1: Технический канал -> Сохраняем в Redis и выходим
+    # (Технический канал обрабатываем первым, ему теги не важны)
     if context.source_type == "tech":
         await cache_media_from_post(message)
         return
+
+    # --- 🚫 ФИЛЬТР: LIFESTYLE (ИГНОР) ---
+    # 1. Сначала извлекаем текст (он нам пригодится и для проверки, и позже)
+    content_text = message.text or message.caption or ""
+
+    # 2. Если находим стоп-слово — полностью останавливаем работу функции
+    if "#lifestyle" in content_text.lower():
+        print(f"🙈 Пост {message.message_id} пропущен (lifestyle)")
+        return  # <--- Ключевой момент: Бот просто выходит из функции здесь
 
     # СЦЕНАРИЙ 2 и 3: Рассылка Юзерам
     async with session_maker() as session:
@@ -33,20 +43,17 @@ async def dispatch_post(context: PostingContext, message: Message, bot: Bot) -> 
 
     # --- 🔥 ЛОГИКА: КОГДА ДЕЛАТЬ FORWARD (ПЕРЕСЫЛКУ) ---
 
-    # 1. Проверяем ХЭШТЕГ (в тексте или подписи)
-    content_text = message.text or message.caption or ""
+    # 1. Проверяем ХЭШТЕГ (для принудительного репоста)
+    # (content_text мы уже получили выше, используем его)
     has_hashtag = "#babykea" in content_text.lower()
 
     # 2. Проверяем ОПРОС (Poll)
-    # У опросов нет caption, поэтому их нельзя пометить хэштегом
     is_poll = message.poll is not None
 
     # 3. Проверяем РЕПОСТ (Forward)
-    # Если ты переслал пост к себе в канал, у него будет поле forward_date
     is_repost = message.forward_date is not None
 
     # ИТОГОВОЕ РЕШЕНИЕ:
-    # Пересылаем (Forward), если выполняется ХОТЯ БЫ ОДНО условие
     should_forward = has_hashtag or is_poll or is_repost
 
     # Запускаем рассылку
@@ -56,6 +63,6 @@ async def dispatch_post(context: PostingContext, message: Message, bot: Bot) -> 
             user_ids=list(user_ids),
             from_chat_id=context.channel_id,
             message_id=message.message_id,
-            should_forward=should_forward  # 👈 Передаем наш умный флаг
+            should_forward=should_forward
         )
     )

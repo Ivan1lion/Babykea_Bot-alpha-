@@ -485,7 +485,7 @@ async def handle_ai_message(message: Message, state: FSMContext, session: AsyncS
                         top_k=10
                     )
 
-                # Условие 3: Премиум агрегатор (ТОП-5)
+                # Условие 2: Премиум агрегатор (ТОП-5)
                 elif feed_url == "PREMIUM_AGGREGATOR":
                     products_context = await search_products(
                         user_query=message.text,
@@ -494,7 +494,7 @@ async def handle_ai_message(message: Message, state: FSMContext, session: AsyncS
                         top_k=10
                     )
 
-                # Условие 2: Пусто или Google_Search -> Идем на сайт
+                # Условие 3: Пусто или Google_Search -> Идем на сайт
                 else:
                     final_shop_url = current_magazine.url_website
 

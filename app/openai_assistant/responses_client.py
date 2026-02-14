@@ -27,63 +27,50 @@ google_client = genai.Client(api_key=os.getenv("GOOGLE_API_KEY"))
 
 async def check_url_status(session: aiohttp.ClientSession, url: str) -> bool:
     """
-    Проверяет доступность ссылки (возвращает True, если статус 200).
+    Проверяет доступность ссылки.
+    Пропускает проверку для поисковиков и маркетплейсов (защита от анти-бот систем).
     """
+    # 1. СПИСОК ИСКЛЮЧЕНИЙ (Домены, которые блокируют ботов, но открываются у людей)
+    TRUSTED_DOMAINS = [
+        "yandex.ru", "yandex.com",
+        "google.com", "google.ru",
+        "ozon.ru", "wildberries.ru", "avito.ru",
+        "youtube.com", "youtu.be"
+    ]
+
+    # Если ссылка ведет на доверенный домен — считаем её рабочей сразу
+    if any(domain in url for domain in TRUSTED_DOMAINS):
+        return True
+
     try:
-        # Используем метод HEAD (запрашиваем только заголовки, без скачивания всей страницы) - это быстро
-        # Но некоторые сайты блокируют HEAD, поэтому надежнее использовать GET с ограничением
-        async with session.get(url, timeout=3, allow_redirects=True) as response:
+        # 2. Маскируемся под браузер (на всякий случай для других сайтов)
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        }
+
+        async with session.get(url, timeout=3, allow_redirects=True, headers=headers) as response:
             if response.status == 200:
                 return True
+
+            # Некоторые сайты возвращают 403 ботам, даже с заголовками.
+            # Если это 403, можно рискнуть и вернуть True, но лучше логировать.
+            if response.status == 403:
+                logger.warning(f"⚠️ Доступ запрещен (403), но ссылка может быть рабочей: {url}")
+                # Можно вернуть True, если доверяешь источнику
+                return True
+
             logger.warning(f"❌ Битая ссылка (Status {response.status}): {url}")
             return False
+
+    except asyncio.TimeoutError:
+        logger.warning(f"⏳ Таймаут проверки ссылки: {url}")
+        return True  # True, потому что не хочу браковать медленные сайты
     except Exception as e:
         logger.warning(f"❌ Ошибка проверки ссылки {url}: {e}")
         return False
 
 
-# async def validate_and_fix_links(text: str) -> str:
-#     """
-#     Находит все Markdown-ссылки в тексте, проверяет их.
-#     Если ссылка битая -> убирает URL, оставляя только название.
-#     """
-#     # Регулярка для поиска ссылок вида [Текст](https://...)
-#     # Группа 1: Текст, Группа 2: URL
-#     link_pattern = re.compile(r'\[([^\]]+)\]\((https?://[^\)]+)\)')
-#
-#     matches = link_pattern.findall(text)
-#     if not matches:
-#         return text  # Ссылок нет, возвращаем как есть
-#
-#     # Собираем уникальные ссылки для проверки
-#     unique_urls = list(set(url for _, url in matches))
-#
-#     # Асинхронно проверяем все ссылки разом
-#     async with aiohttp.ClientSession() as session:
-#         tasks = [check_url_status(session, url) for url in unique_urls]
-#         results = await asyncio.gather(*tasks)
-#
-#     # Создаем карту: URL -> Доступен (True/False)
-#     url_status = dict(zip(unique_urls, results))
-#
-#     # Функция замены для re.sub
-#     def replace_match(match):
-#         title = match.group(1)
-#         url = match.group(2)
-#
-#         if url_status.get(url, False):
-#             # Ссылка живая - оставляем как есть
-#             return f"[{title}]({url})"
-#         else:
-#             # Ссылка мертвая - оставляем только текст + пометку (или просто текст)
-#             # Вариант 1: "Anex Air-Z (ссылка не найдена)"
-#             # Вариант 2 (твой выбор): Просто "Anex Air-Z" (ссылка удаляется)
-#             return f"{title} (извините ссылка на товар не найдена)"
-#
-#             # Заменяем все вхождения в тексте
-#
-#     fixed_text = link_pattern.sub(replace_match, text)
-#     return fixed_text
+
 
 async def validate_and_fix_links(text: str) -> str:
     """
@@ -117,7 +104,7 @@ async def validate_and_fix_links(text: str) -> str:
             return f'<a href="{url}">{title}</a>'
         else:
             # Ссылка мертвая - убираем тег, оставляем текст
-            return f'{title} (ссылка не найдена)'
+            return f'{title}'
 
     fixed_text = link_pattern.sub(replace_match, text)
     return fixed_text
