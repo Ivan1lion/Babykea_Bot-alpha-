@@ -112,9 +112,11 @@ async def contacts_cmd(message: Message, session: AsyncSession):
             photo="https://i.postimg.cc/zBSgzjss/i.jpg",
             caption=(
                 "🏆 <b>Магазины с высокой репутацией</b>\n\n"
-                "• Первая коляска\n"
+                "• Первая-Коляска\u200B.РФ\n"
                 "• Boan Baby\n"
-                "• Lapsi"
+                "• Lapsi\n"
+                "• Кенгуру\n"
+                "• Piccolo\n"
             ),
         )
         return

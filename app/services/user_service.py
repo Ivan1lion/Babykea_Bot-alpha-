@@ -5,7 +5,7 @@ from app.db.models import User
 from app.schemas import UserCache
 from app.redis_client import redis_client
 
-USER_TTL = 3600  # Время жизни кэша (1 час)
+USER_TTL = 300  # Время жизни кэша (5 мин)
 
 
 async def get_user_cached(session: AsyncSession, telegram_id: int) -> UserCache | None:
@@ -88,3 +88,4 @@ async def update_user_flags(session: AsyncSession, telegram_id: int, **kwargs):
 
     # Сбрасываем кэш
     await redis_client.delete(f"user:{telegram_id}")
+
