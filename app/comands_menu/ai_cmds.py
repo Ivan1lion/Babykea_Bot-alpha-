@@ -37,7 +37,7 @@ async def cmd_ai_consultant(message: Message, bot:Bot, session: AsyncSession):
 
         # 1. Пытаемся отправить мгновенно через Redis (PRO способ)
         # Мы ищем file_id, который сохранили под именем "ai_intro"
-        video_note_id = await redis_client.get("media:ai_intro")
+        video_note_id = await redis_client.get("media:ai_video")
 
         if video_note_id:
             try:

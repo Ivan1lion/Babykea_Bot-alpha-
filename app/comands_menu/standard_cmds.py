@@ -1,3 +1,5 @@
+import os
+
 from aiogram import Router, Bot
 from aiogram.types import Message, BotCommand, LinkPreviewOptions
 from aiogram.filters import Command
@@ -10,9 +12,9 @@ standard_router = Router()
 
 
 bot_menu = [
-    BotCommand(command="what", description="⁉️ Как подобрать коляску"),
-    BotCommand(command="where", description="💢 Как не сломать коляску"),
-    BotCommand(command="when", description="✅ Как продлить жизнь коляске"),
+    BotCommand(command="guide", description="⁉️ Как подобрать коляску"),
+    BotCommand(command="rules", description="💢 Как не сломать коляску"),
+    BotCommand(command="service", description="✅ Как продлить жизнь коляске"),
     BotCommand(command="ai_consultant", description="🤖 AI-консультант"),
     BotCommand(command="blog", description="️🧔‍♂️ Блог мастера"),
     BotCommand(command="help", description="🆘 Помощь"),
@@ -22,7 +24,7 @@ bot_menu = [
 ]
 
 
-
+my_channel_id = int(os.getenv("MY_CHANNEL_ID"))
 
 @standard_router.message(Command("blog"))
 async def blog_cmd(message: Message, bot: Bot, session: AsyncSession):
@@ -32,7 +34,7 @@ async def blog_cmd(message: Message, bot: Bot, session: AsyncSession):
 
     await bot.forward_message(
         chat_id=message.chat.id,
-        from_chat_id=-1003540154410,  # ID группы
+        from_chat_id=my_channel_id,  # ID группы (Авторский канал)
         message_id=7  # ID сообщения из группы
     )
 

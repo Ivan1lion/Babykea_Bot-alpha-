@@ -65,7 +65,7 @@ async def cmd_start(message: Message, bot: Bot, session: AsyncSession):
     await get_or_create_user(session, message.from_user.id, message.from_user.username)
     # 1. Пытаемся отправить мгновенно через Redis (PRO способ)
     # Мы ищем file_id, который сохранили под именем "intro_video"
-    video_note_id = await redis_client.get("media:intro_video")
+    video_note_id = await redis_client.get("media:start_video")
 
     if video_note_id:
         try:
