@@ -56,8 +56,7 @@ async def cache_media_from_post(message: Message):
 
         # Сохраняем в Redis
         await redis_client.set(redis_key, file_id)
-
-        logger.info(f"✅ MEDIA CACHED (via Reply/Caption): {redis_key} -> {file_id}")
+        logger.info(f"✅ MEDIA CACHED: {redis_key} -> {file_id}")
 
         # (Опционально) Можем отправить реакцию или ответ, чтобы ты видел, что бот "съел" файл
         try:

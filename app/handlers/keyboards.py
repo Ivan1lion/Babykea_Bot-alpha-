@@ -90,7 +90,7 @@ pay = InlineKeyboardMarkup(inline_keyboard=[
 
 def payment_button_keyboard(confirmation_url: str) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="💳 Перейти к оплате", url=confirmation_url)]
+        [InlineKeyboardButton(text="💳 Перейти к оплате", url=confirmation_url, style="success")]
     ])
 
 

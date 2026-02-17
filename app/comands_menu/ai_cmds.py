@@ -20,6 +20,8 @@ ai_router = Router()
 logger = logging.getLogger(__name__)
 
 tech_channel_id = int(os.getenv("TECH_CHANNEL_ID"))
+ai_post = int(os.getenv("AI_POST"))
+
 
 @ai_router.message(Command("ai_consultant"))
 async def cmd_ai_consultant(message: Message, bot:Bot, session: AsyncSession):
@@ -37,7 +39,7 @@ async def cmd_ai_consultant(message: Message, bot:Bot, session: AsyncSession):
 
         # 1. Пытаемся отправить мгновенно через Redis (PRO способ)
         # Мы ищем file_id, который сохранили под именем "ai_intro"
-        video_note_id = await redis_client.get("media:ai_video")
+        video_note_id = await redis_client.get("media:ai_post")
 
         if video_note_id:
             try:
@@ -64,7 +66,7 @@ async def cmd_ai_consultant(message: Message, bot:Bot, session: AsyncSession):
             await bot.copy_message(
                 chat_id=message.chat.id,
                 from_chat_id=tech_channel_id,  # ID группы
-                message_id=35,  # ID сообщения из группы
+                message_id=ai_post,  # ID сообщения из группы
             )
             await asyncio.sleep(1)
             await message.answer(

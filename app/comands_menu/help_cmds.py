@@ -80,9 +80,15 @@ async def help_cmd(message: Message, session: AsyncSession):
 
 # --- 2. Умный обработчик (Lazy Loading) ---
 @help_router.message(F.text.in_(FAQ_CONFIG.keys()))
-async def send_faq_video(message: Message, session: AsyncSession):
+async def send_faq_video(message: Message):
+    """
+    Ленивая загрузка видео через Redis кэш + технический канал
+    """
+    # 2. Получаем команду прямо из текста
     command = message.text
     config = FAQ_CONFIG.get(command)
+    if not config:
+        return
 
     redis_key = config["redis_key"]
     channel_msg_id = config["msg_id"]
@@ -92,17 +98,16 @@ async def send_faq_video(message: Message, session: AsyncSession):
         cached_file_id = await redis_client.get(redis_key)
 
         if cached_file_id:
-            # 🚀 ВАРИАНТ А: Видео есть в кэше -> Отправляем быстро
+            # 🚀 ВАРИАНТ А: Видео есть в кэше
             await message.answer_video(
                 video=cached_file_id,
                 caption=f"📹 Видео-ответ по запросу: {command}"
             )
             return
 
-        # 🐢 ВАРИАНТ Б: В кэше пусто (или рестарт) -> Берем из канала
-        print(f"🔄 Кэш пуст для {command}. Копирую из канала...")
+        # 🐢 ВАРИАНТ Б: В кэше пусто -> Берем из канала
+        logger.info(f"🔄 Кэш пуст для {command}. Копирую из канала...")
 
-        # Копируем сообщение из канала юзеру
         sent_msg = await message.bot.copy_message(
             chat_id=message.chat.id,
             from_chat_id=tech_channel_id,
@@ -110,21 +115,10 @@ async def send_faq_video(message: Message, session: AsyncSession):
             caption=f"📹 Видео-ответ по запросу: {command}"
         )
 
-        # 🔥 САМОЕ ВАЖНОЕ: Сохраняем свежий file_id в Redis на будущее
-        # Проверяем, что это видео, и берем самый качественный вариант (-1)
-        if sent_msg.video:
-            new_file_id = sent_msg.video.file_id
-            # Сохраняем в Redis (можно навечно, или на месяц)
-            await redis_client.set(redis_key, new_file_id)
-            print(f"✅ Новый file_id сохранен в Redis: {redis_key}")
-
-        elif sent_msg.video_note:
-            new_file_id = sent_msg.video_note.file_id
-            await redis_client.set(redis_key, new_file_id)
 
     except Exception as e:
         logger.error(f"❌ Ошибка Lazy Loading: {e}")
-        await message.answer("Извините, видео временно недоступно.")
+        await message.answer("Извините, видео временно недоступно. Перезагружаем сервер. Повторите попытку через 5 мин")
 
 
 

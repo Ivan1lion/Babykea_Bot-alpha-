@@ -5,8 +5,8 @@ from aiogram import Bot
 from aiogram.exceptions import TelegramRetryAfter, TelegramForbiddenError, TelegramBadRequest
 from app.posting.errors import deactivate_user
 
-BATCH_SIZE = 25
-RATE_LIMIT = 1.05
+BATCH_SIZE = 20
+RATE_LIMIT = 1.5
 
 logger = logging.getLogger(__name__)
 

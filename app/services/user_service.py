@@ -1,10 +1,13 @@
 import json
+import logging
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.models import User
 from app.schemas import UserCache
 from app.redis_client import redis_client
 
+
+logger = logging.getLogger(__name__)
 USER_TTL = 300  # Время жизни кэша (5 мин)
 
 
@@ -16,10 +19,11 @@ async def get_user_cached(session: AsyncSession, telegram_id: int) -> UserCache 
     redis_key = f"user:{telegram_id}"
 
     # 1. Пробуем достать из Redis
+    # --- БЕЗОПАСНОЕ ЧТЕНИЕ ИЗ REDIS ---
     raw_data = await redis_client.get(redis_key)
     if raw_data:
-        # ✅ Вернули из кэша (БД не трогаем)
-        return UserCache(**json.loads(raw_data))
+        return UserCache(**json.loads(raw_data))  # ← Нашли в кэше — сразу возвращаем
+    # ----------------------------------
 
     # 2. Если в кэше нет — идем в БД
     result = await session.execute(select(User).where(User.telegram_id == telegram_id))
@@ -44,7 +48,10 @@ async def get_user_cached(session: AsyncSession, telegram_id: int) -> UserCache 
     )
 
     # 3. Сохраняем в Redis
+    # --- БЕЗОПАСНАЯ ЗАПИСЬ В REDIS ---
     await redis_client.set(redis_key, user_dto.model_dump_json(), ex=USER_TTL)
+    logger.debug(f"💾 Cached user {telegram_id} for {USER_TTL}s")
+    # ----------------------------------
 
     return user_dto
 
@@ -68,9 +75,11 @@ async def update_user_requests(session: AsyncSession, telegram_id: int, decremen
     await session.commit()
 
     if updated_user:
-        # 2. Инвалидируем (удаляем) старый кэш, чтобы при следующем запросе подтянулись свежие данные
-        # (просто удаляем, пусть следующий get сам сходит в базу):
+        # 2. Инвалидируем (удаляем) старый кэш
+        # --- БЕЗОПАСНАЯ ИНВАЛИДАЦИЯ ---
         await redis_client.delete(f"user:{telegram_id}")
+        logger.debug(f"🗑️ Invalidated cache for user {telegram_id}")
+        # -------------------------------
 
 
 async def update_user_flags(session: AsyncSession, telegram_id: int, **kwargs):
@@ -87,5 +96,8 @@ async def update_user_flags(session: AsyncSession, telegram_id: int, **kwargs):
     await session.commit()
 
     # Сбрасываем кэш
+    # --- БЕЗОПАСНАЯ ИНВАЛИДАЦИЯ ---
     await redis_client.delete(f"user:{telegram_id}")
+    logger.debug(f"🗑️ Invalidated cache for user {telegram_id}")
+    # -------------------------------
 

@@ -45,6 +45,9 @@ logger = logging.getLogger(__name__)
 for_user_router = Router()
 
 tech_channel_id = int(os.getenv("TECH_CHANNEL_ID"))
+start_post = int(os.getenv("START_POST"))
+ai_post = int(os.getenv("AI_POST"))
+
 
 class ActivationState(StatesGroup):
     waiting_for_promo_code = State()
@@ -64,7 +67,8 @@ TOP_SHOPS_IDS = [2]
 async def cmd_start(message: Message, bot: Bot, session: AsyncSession):
     await get_or_create_user(session, message.from_user.id, message.from_user.username)
     # 1. Пытаемся отправить мгновенно через Redis (PRO способ)
-    # Мы ищем file_id, который сохранили под именем "intro_video"
+    # Мы ищем file_id, который сохранили под именем "start_video"
+    # === ПОПЫТКА 1: REDIS (безопасная) ===
     video_note_id = await redis_client.get("media:start_video")
 
     if video_note_id:
@@ -84,10 +88,10 @@ async def cmd_start(message: Message, bot: Bot, session: AsyncSession):
         await bot.copy_message(
             chat_id=message.chat.id,
             from_chat_id=tech_channel_id, # ID тех канала
-            message_id=28,  # ID сообщения из группы
+            message_id=start_post,  # ID сообщения из группы
             reply_markup=kb.quiz_start
         )
-        print(f"🔔 ПОПЫТКА 2: Пересылка из канала)")
+        print(f"🔔 ПОПЫТКА 2: Пересылка из канала")
         return
     except Exception:
         pass  # Идем к самому надежному варианту
@@ -212,12 +216,8 @@ async def process_promo_code(
     # Следующий запрос (get_user_cached) вынужден будет пойти в БД
     # и достать юзера уже с НОВЫМ ID магазина.
     # ==========================================================
-    try:
-        await redis_client.delete(f"user:{message.from_user.id}")
-        logger.info(f"♻️ Кэш для юзера {message.from_user.id} успешно сброшен после активации промокода.")
-    except Exception as e:
-        # 🔥 exc_info=True покажет полный путь ошибки, если она случится
-        logger.error(f"❌ Ошибка очистки кэша Redis для {message.from_user.id}: {e}", exc_info=True)
+    await redis_client.delete(f"user:{message.from_user.id}")
+    logger.info(f"♻️ Кэш для юзера {message.from_user.id} успешно сброшен после активации промокода.")
     # ==========================================================
     await state.clear()
 
@@ -622,8 +622,8 @@ async def handle_no_state(message: Message, bot:Bot, session: AsyncSession):
         # 🚀 Обновляем флаг через сервис (БД обновляется, кэш сбрасывается)
         await update_user_flags(session, user.telegram_id, show_intro_message=False)
         # 1. Пытаемся отправить мгновенно через Redis (PRO способ)
-        # Мы ищем file_id, который сохранили под именем "intro_video"
-        video_note_id = await redis_client.get("media:ai_intro")
+        # Мы ищем file_id, который сохранили под именем "ai_post"
+        video_note_id = await redis_client.get("media:ai_post")
 
         if video_note_id:
             try:
@@ -650,7 +650,7 @@ async def handle_no_state(message: Message, bot:Bot, session: AsyncSession):
             await bot.copy_message(
                 chat_id=message.chat.id,
                 from_chat_id=tech_channel_id,  # ID группы
-                message_id=35,  # ID сообщения из группы
+                message_id=ai_post,  # ID сообщения из группы
             )
             await asyncio.sleep(1)
             await message.answer(
