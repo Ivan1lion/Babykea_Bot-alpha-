@@ -21,12 +21,11 @@ service_post = int(os.getenv("SERVICE_POST"))
 
 
 @info_router.message(Command("guide"))
-async def what_cmd(message: Message, bot:Bot, session: AsyncSession):
+async def guide_cmd(message: Message, bot:Bot, session: AsyncSession):
     if await closed_menu(message=message, session=session):
         return
     # # 1. Пытаемся отправить мгновенно через Redis (PRO способ)
-    # # Мы ищем file_id, который сохранили под именем "intro_video"
-    # video_id = await redis_client.get("media:guide_post")
+    # # Мы ищем file_id, который сохранили под именем "guide_video"
     text = (f"📝 <b>Шпаргалка: «Что нужно учитывать при подборе»</b>"
             f"\n\n<b>1. Основа:</b>"
             f"\n\n• Тип коляски (от рождения или прогулка)"
@@ -108,19 +107,61 @@ async def what_cmd(message: Message, bot:Bot, session: AsyncSession):
 
 
 @info_router.message(Command("rules"))
-async def where_cmd(message: Message, session: AsyncSession):
-
+async def rules_cmd(message: Message, session: AsyncSession):
     if await closed_menu(message=message, session=session):
         return
+        # # 1. Пытаемся отправить мгновенно через Redis (PRO способ)
+        # # Мы ищем file_id, который сохранили под именем "rules_video"
+        # === ПОПЫТКА 1: REDIS (Теперь безопасная) ===
+        video_id = await redis_client.get("media:rules_post")
+        if video_id:
+            try:
+                await message.answer_video(
+                    video=video_id,
+                    caption=f"<b>Если видео долго грузится можете просмотреть его тут:</b>"
+                            f"\n\nYouTube - https://www.youtube.com/"
+                            f"\n\nRUTUBE - https://rutube.ru/"
+                            f"\n\nVK Видео - https://vkvideo.ru/"
+                )
+                await message.answer(text=text)
+                print(f"🔔 ПОПЫТКА 1: Redis)")
+                return  # Успех, выходим
+            except Exception as e:
+                logger.error(f"Ошибка отправки video_note из Redis: {e}")
 
-    await message.answer(f" 1. Карусель видеороликов о правилах правильной эксплуатации"
-                         f"\n\n 2. Призыв перейти в раздел '💊 Как продлить жизнь коляске'")
+        # 2. FALLBACK 1: Если в Redis пусто, пробуем copy_message (Старый способ)
+        # Это страховка на случай, если ты забыл загрузить видео в тех.канал
+        try:
+            await bot.copy_message(
+                chat_id=message.chat.id,
+                from_chat_id=tech_channel_id,  # ID тех канала
+                message_id=rules_post,  # ID сообщения из группы
+                caption=f"<b>Если видео долго грузится можете просмотреть его тут:</b>"
+                        f"\n\nYouTube - https://www.youtube.com/"
+                        f"\n\nRUTUBE - https://rutube.ru/"
+                        f"\n\nVK Видео - https://vkvideo.ru/"
+            )
+            await message.answer(text=text)
+            print(f"🔔 ПОПЫТКА 2: Пересылка из канала)")
+            return
+        except Exception as e:
+            logger.error(f"❌ FALLBACK 1 failed: {e}")
+
+        logger.error("❌ Redis и технический канал недоступны")
+        await message.answer(
+            text=f"<b>Выберите, где Вам удобнее просмотреть видео:</b>"
+                 f"\n\nYouTube - https://www.youtube.com/"
+                 f"\n\nRUTUBE - https://rutube.ru/"
+                 f"\n\nVK Видео - https://vkvideo.ru/"
+                 f"\n\n{text}"
+        )
+
 
 
 
 
 @info_router.message(Command("service"))
-async def when_cmd(message: Message, session: AsyncSession):
+async def service_cmd(message: Message, session: AsyncSession):
 
     if await closed_menu(message=message, session=session):
         return
