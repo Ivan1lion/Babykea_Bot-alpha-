@@ -52,6 +52,7 @@ services:
     command: >
       --requirepass ${REDIS_PASSWORD}
       --save 60 1
+      --appendonly yes
       --loglevel warning
     volumes:
       - redis_data:/data

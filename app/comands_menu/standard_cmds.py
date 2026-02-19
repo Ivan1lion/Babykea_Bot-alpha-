@@ -14,7 +14,7 @@ standard_router = Router()
 bot_menu = [
     BotCommand(command="guide", description="⁉️ Как подобрать коляску"),
     BotCommand(command="rules", description="💢 Как не сломать коляску"),
-    BotCommand(command="service", description="✅ Как продлить жизнь коляске"),
+    BotCommand(command="manual", description="✅ Как продлить жизнь коляске"),
     BotCommand(command="ai_consultant", description="🤖 AI-консультант"),
     BotCommand(command="blog", description="️🧔‍♂️ Блог мастера"),
     BotCommand(command="help", description="🆘 Помощь"),

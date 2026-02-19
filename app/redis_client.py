@@ -126,5 +126,17 @@ class SafeRedis:
             return 0
 
 
+    ############### Удолить перед деплоем !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    async def keys(self, pattern: str) -> list[str]:
+        if not self._connected:
+            return []
+        try:
+            return await self._client.keys(pattern)
+        except (RedisError, Exception) as e:
+            await self._on_error(e)
+            return []
+###############################################################################################################
+
+
 # Создаём глобальный клиент — импортируется везде как раньше
 redis_client = SafeRedis()
