@@ -44,6 +44,7 @@ get_wb_link = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="
 
 
 
+
 #Для выбора типа использования AI
 def get_ai_mode_kb():
     kb = InlineKeyboardBuilder()

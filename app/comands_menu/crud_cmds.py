@@ -1,13 +1,14 @@
 import re
+import urllib.parse
 from aiogram import Router, F
 from aiogram.filters import Command, StateFilter
-from aiogram.types import Message
+from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.fsm.context import FSMContext
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import User, Magazine
-from app.handlers.keyboards import magazine_map_kb
+import app.handlers.keyboards as kb
 from app.comands_menu.states import MenuStates
 from app.comands_menu.email_for_menu import update_user_email
 from app.db.crud import closed_menu
@@ -29,12 +30,10 @@ async def config_cmd(message: Message, session: AsyncSession):
     await message.answer(f"1. /quiz_restart - пройти квиз-опрос заново"
                          f"<blockquote>На основании ваших ответов AI-консультант подбирает и сравнивает коляски, "
                          f"соответствующие запросу</blockquote>"
-                         f"\n\n/email - указать email для получения чеков"
+                         f"\n\n2. /email - указать email для получения чеков"
                          f"<blockquote>При необходимости вы можете указать свой email для получения чеков  об оплате "
                          f"на свою почту</blockquote>"
-                         f"\n\n2. Изменить время ТО"
-                         f"\n\n3. Сохраненная информация"
-                         f"\n\n4. Поделиться кодом активации"
+                         f"\n\n3. /promo - Поделиться кодом активации с подругой"
                          )
 
 
@@ -83,6 +82,52 @@ async def process_email_input(message: Message, state: FSMContext, session: Asyn
         await message.answer("Ошибка при сохранении. Попробуйте позже.")
         print(f"Error saving email: {e}")
         await state.clear()
+
+
+@crud_router.message(Command("promo"))
+async def promo_cmd(message: Message, session: AsyncSession):
+    # 1. Достаем промокод юзера из БД
+    stmt = select(User.promo_code).where(User.telegram_id == message.from_user.id)
+    result = await session.execute(stmt)
+    promo_code = result.scalar_one_or_none()
+
+    # Защита от ошибки: если у юзера почему-то пустой промокод
+    if not promo_code:
+        await message.answer("У вас пока нет активного кода активации.")
+        return
+
+    # Настройки
+    bot_link = "https://t.me/babykea_bot"
+    photo_id = "AgACAgIAAyEGAATQjmD4AANnaY3ziPd3A8eUTwbZqo6-aqCuxmYAAmQaaxs1a3FI56_9NYQIxA0BAAMCAAN5AAM6BA"
+
+    # 2. Формируем текст для ДРУГА (то, что появится в поле ввода при пересылке)
+    share_text = f"Промокод на бесплатное подключение: {promo_code}"
+
+    # Обязательно кодируем текст для URL (чтобы кириллица и пробелы не сломали ссылку)
+    encoded_text = urllib.parse.quote(share_text)
+
+    # Специальная ссылка Telegram для шаринга
+    share_url = f"https://t.me/share/url?url={bot_link}&text={encoded_text}"
+
+    # 3. Создаем кнопку с url-переходом
+    share_kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="↗️ Поделиться ссылкой", url=share_url)]
+    ])
+
+    # 4. Формируем текст сообщения ВНУТРИ бота (для самого юзера)
+    caption = (
+        f"Ваш код активации <b>{promo_code}</b>\n\n"
+        f"Вы можете им поделиться со своими друзьями:\n"
+        f"{bot_link}"
+    )
+
+    # 5. Отправляем фото с текстом и кнопкой
+    await message.answer_photo(
+        photo=photo_id,
+        caption=caption,
+        reply_markup=share_kb
+    )
+
 
 
 
@@ -138,10 +183,10 @@ async def contacts_cmd(message: Message, session: AsyncSession):
         await message.answer_photo(
             photo=magazine.photo,
             caption=text,
-            reply_markup=magazine_map_kb(magazine.map_url),
+            reply_markup=kb.magazine_map_kb(magazine.map_url),
         )
     else:
         await message.answer(
             text,
-            reply_markup=magazine_map_kb(magazine.map_url),
+            reply_markup=kb.magazine_map_kb(magazine.map_url),
         )
