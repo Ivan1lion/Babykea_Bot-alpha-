@@ -60,13 +60,13 @@ class User(Base):
     )
     email: Mapped[str] = mapped_column(String(150), nullable=True)
     stroller_model: Mapped[str] = mapped_column(String(50), nullable=True)
-    # stroller_condition: Mapped[str] = mapped_column(String(50), nullable=True)
     requests_left: Mapped[int] = mapped_column(Integer, default=1)
     closed_menu_flag: Mapped[bool] = mapped_column(Boolean, default=True)
     first_catalog_request: Mapped[bool] = mapped_column(Boolean, default=True)
     first_info_request: Mapped[bool] = mapped_column(Boolean, default=True)
     show_intro_message: Mapped[bool] = mapped_column(Boolean, default=True)
     is_active: Mapped[bool] = mapped_column(default=True)
+    wb_clicked_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 

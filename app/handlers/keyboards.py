@@ -38,6 +38,12 @@ next_service = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text=
 
 
 
+#Кнопка для аналитики "кол-во кликнувших по ссылке юзеров"
+get_wb_link = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="🟣 Смазка на WB",
+                                                                         callback_data="get_wb_link")]])
+
+
+
 #Для выбора типа использования AI
 def get_ai_mode_kb():
     kb = InlineKeyboardBuilder()

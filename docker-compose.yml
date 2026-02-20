@@ -1,7 +1,7 @@
 version: '3.8'
 
 services:
-  # 1. Твой Бот
+##   1. Твой Бот
 #  bot:
 #    build: .
 #    container_name: babykea_bot
@@ -27,7 +27,7 @@ services:
 #      - redis
 #    networks:
 #      - bot_net
-
+#
 #  # 2. База данных PostgreSQL
 #  db:
 #    image: postgres:15-alpine
@@ -44,7 +44,8 @@ services:
 #    networks:
 #      - bot_net
 
-  # 3. Redis (Кэш и FSM)
+
+# 3. Redis (Кэш и FSM)
   redis:
     image: redis:7.2-alpine
     container_name: babykea_redis
@@ -57,21 +58,34 @@ services:
     volumes:
       - redis_data:/data
     ports:
-      - "6379:6379" # Открываем порт для отладки с локалки
+      - "6379:6379"
+    networks:
+      - bot_net
+
+  # 4. Metabase (Аналитика)
+  metabase:
+    image: metabase/metabase:latest
+    container_name: babykea_metabase
+    restart: always
+    ports:
+      - "3000:3000" # Открываем порт для браузера
+    extra_hosts:
+      - "host.docker.internal:host-gateway" # 🔥 МАГИЯ: Позволяет Metabase видеть твой комп
+    volumes:
+      - metabase_data:/metabase-data
+    environment:
+      MB_DB_FILE: /metabase-data/metabase.db
     networks:
       - bot_net
 
 volumes:
   postgres_data:
   redis_data:
+  metabase_data: # <--- Не забудь добавить это хранилище!
 
 networks:
   bot_net:
     driver: bridge
 
 
-#redis:
-#    image: redis:alpine
-#    command: redis-server --appendonly yes  # 👈 Включает сохранение на диск
-#    volumes:
-#      - redis_data:/data
+

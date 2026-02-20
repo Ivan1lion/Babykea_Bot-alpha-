@@ -3,12 +3,17 @@ import logging
 from aiogram import F, Router, Bot
 from aiogram.types import Message, CallbackQuery
 from aiogram.exceptions import TelegramBadRequest
-from aiogram.filters import Command
+from aiogram.filters import Command, StateFilter
+from aiogram.fsm.context import FSMContext
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select, update
+from sqlalchemy.sql import func
+from app.db.models import User
 
 from app.db.crud import closed_menu
 import app.handlers.keyboards as kb
 from app.redis_client import redis_client
+from app.comands_menu.states import ServiceState
 
 
 logger = logging.getLogger(__name__)
@@ -34,7 +39,7 @@ async def guide_cmd(message: Message, bot:Bot, session: AsyncSession):
             f"\n• Формат использования (для прогулок или путешествий)"
             f"\n• Сезон (зима или лето)"
             f"\n• Тип дорог (грунт, асфальт или бездорожье)"
-            f"\n\n👆 <i>Эти вопросы мы закрыли в самом начале, когда вы проходили квиз-опрос. Это база (фундамент) "
+            f"\n\n👆 <i>Эти вопросы мы закрыли в самом начале, когда Вы проходили квиз-опрос. Это база (фундамент) "
             f"для поиска и подбора подходящей коляски</i>"
             f"\n\n<b>2. Жизненные нюансы (на этом часто «спотыкаются»):</b>"
             f"\n<i>Негативное влияние этих деталей вы также можете почувствовать на себе уже после покупки, если "
@@ -105,8 +110,6 @@ async def guide_cmd(message: Message, bot:Bot, session: AsyncSession):
 
 
 
-
-
 @info_router.message(Command("rules"))
 async def rules_cmd(message: Message, session: AsyncSession):
     if await closed_menu(message=message, session=session):
@@ -153,10 +156,6 @@ async def rules_cmd(message: Message, session: AsyncSession):
              f"\n\nRUTUBE - https://rutube.ru/"
              f"\n\nVK Видео - https://vkvideo.ru/"
     )
-
-
-
-
 
 
 
@@ -224,7 +223,7 @@ async def process_next_rules_button(callback: CallbackQuery):
 
     # 2. Формируем текст с HTML разметкой
     text = (
-        "📌 <b>Памятка: 3 способа не убить коляску</b>"
+        "📌 <b>Памятка: 3 способа как не убить коляску</b>"
         "\n\n🚿 <b>Никакого душа</b>"
         "<blockquote>Не мойте колеса из шланга или в ванной. Вода вымоет смазку и подшипники сгниют "
         "за месяц. Только влажная тряпка</blockquote>"
@@ -237,19 +236,104 @@ async def process_next_rules_button(callback: CallbackQuery):
         "\n\nСмазку, которой я пользуюсь в мастерской, обычно покупаю у своего поставщика запчастей и прочих "
         "расходников. На валдберриз такую же не нашел, но нашел с такими же характеристиками, соотношение газа к "
         "масляному раствору отличное и по цене норм"
-        "\n\n<a href='https://www.wildberries.ru/catalog/191623733/detail.aspx?targetUrl=MI'>Смазка силиконовая "
-        "для колясок https://www.wildberries.ru/catalog/191623733/detail.aspx?targetUrl=MI</a>"
+        # "\n\n<a href='https://www.wildberries.ru/catalog/191623733/detail.aspx?targetUrl=MI'>Смазка силиконовая "
+        # "для колясок https://www.wildberries.ru/catalog/191623733/detail.aspx?targetUrl=MI</a>"
         "\n\nЕсли смазывать только коляску, то флакона хватит на пару лет"
         "\n<blockquote><i>👆 Памятка сохранена в разделе</i> "
         "\n[👤 Мой профиль]</blockquote>"
         "\n\n/service - Встать на плановое ТО"
     )
-
     # 3. Отправляем новое сообщение (disable_web_page_preview убирает огромное превью от ссылки на WB)
     await callback.message.answer(
         text=text,
+        reply_markup=kb.get_wb_link,
         disable_web_page_preview=True
     )
-
     # 4. "Гасим" часики загрузки на нажатой кнопке
     await callback.answer()
+
+
+
+
+@info_router.callback_query(F.data == "get_wb_link")
+async def process_get_wb_link(callback: CallbackQuery, session: AsyncSession):
+    user_id = callback.from_user.id
+
+    # 1. ЗАПИСЬ В АНАЛИТИКУ (Если первый клик)
+    stmt = select(User.wb_clicked_at).where(User.telegram_id == user_id)
+    clicked_at = (await session.execute(stmt)).scalar_one_or_none()
+
+    if clicked_at is None:
+        await session.execute(
+            update(User).where(User.telegram_id == user_id).values(wb_clicked_at=func.now())
+        )
+        await session.commit()
+    # 2. ФОРМИРУЕМ НОВЫЙ ТЕКСТ (С добавленной ссылкой)
+    new_text = (
+        "<a href='https://www.wildberries.ru/catalog/191623733/detail.aspx?targetUrl=MI'>Смазка силиконовая "
+        "для колясок https://www.wildberries.ru/catalog/191623733/detail.aspx?targetUrl=MI</a>"
+    )
+    # 3. РЕДАКТИРУЕМ СООБЩЕНИЕ
+    try:
+        await callback.message.edit_text(
+            text=new_text,
+            # 🔥 ВАЖНО: Включаем превью, чтобы Telegram сам подтянул картинку товара!
+            disable_web_page_preview=False,
+            # 🔥 ВАЖНО: Убираем клавиатуру (кнопку), передав None
+            reply_markup=None
+        )
+    except Exception as e:
+        # Игнорируем ошибку, если юзер зачем-то дважды быстро кликнул и текст не изменился
+        pass
+    # 4. Убираем "часики" на кнопке
+    await callback.answer()
+
+
+
+
+@info_router.message(Command("service"))
+async def cmd_service(message: Message, state: FSMContext):
+    text = (
+        "🛠 <b>Запись на плановое ТО</b>\n\n"
+        "Пожалуйста, напишите марку и модель вашей коляски одним сообщением "
+        "\n\n(например: <i>Tutis Uno 3+</i>, <i>Cybex Priam</i> или <i>Anex m/type</i>)."
+    )
+    await message.answer(text=text)
+    # Включаем состояние "ожидание ввода модели"
+    await state.set_state(ServiceState.waiting_for_model)
+
+
+
+@info_router.message(StateFilter(ServiceState.waiting_for_model), F.text)
+async def process_stroller_model(message: Message, state: FSMContext, session: AsyncSession):
+    user_model = message.text
+    user_id = message.from_user.id
+
+    # 1. Записываем модель коляски в БД (колонка stroller_model)
+    try:
+        stmt = (
+            update(User)
+            .where(User.telegram_id == user_id)
+            .values(stroller_model=user_model)
+        )
+        await session.execute(stmt)
+        await session.commit()
+    except Exception as e:
+        logger.error(f"Ошибка при записи модели коляски для ТО: {e}")
+        await message.answer("Произошла ошибка при записи. Пожалуйста, попробуйте позже")
+        await state.clear()
+        return
+
+    # 2. Выключаем состояние (выходим из FSM)
+    await state.clear()
+
+    # 3. Отправляем подтверждение юзеру
+    success_text = (
+        "✅ <b>Ваша коляска поставлена на учет!</b>\n\n"
+        f"<b>Модель:</b> <i>{user_model}</i>\n\n"
+        "Уведомление придет, когда настанет время для ТО. "
+        "Система учитывает особенности вашей модели и текущее время года, "
+        "чтобы напомнить о профилактике ровно тогда, когда это действительно необходимо 🗓"
+    )
+
+    await message.answer(text=success_text)
