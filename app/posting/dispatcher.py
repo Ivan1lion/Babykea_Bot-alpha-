@@ -29,12 +29,16 @@ async def dispatch_post(context: PostingContext, message: Message, bot: Bot) -> 
 
     # СЦЕНАРИЙ 2 и 3: Рассылка Юзерам
     async with session_maker() as session:
-        # Строим запрос пользователей
+        # Базовое правило для ВСЕХ рассылок: бот должен быть НЕ заблокирован
         stmt = select(User.telegram_id).where(User.is_active == True)
 
         if context.source_type == "magazine":
-            # Фильтр: Только подписчики этого магазина
+            # Фильтр для магазина: шлем только подписчикам этого магазина
             stmt = stmt.where(User.magazine_id == context.magazine_id)
+
+        elif context.source_type == "author":
+            # Фильтр для автора: шлем только тем, кто не отписался от блога
+            stmt = stmt.where(User.subscribed_to_author == True)
 
         result = await session.execute(stmt)
         user_ids = result.scalars().all()
@@ -67,3 +71,4 @@ async def dispatch_post(context: PostingContext, message: Message, bot: Bot) -> 
             should_forward=should_forward
         )
     )
+

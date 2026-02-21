@@ -17,11 +17,3 @@ menu_cmds_router.include_router(help_router)
 
 # Экспортируем для использования в main.py
 __all__ = ["menu_cmds_router"]
-
-
-# app/comands_menu/
-# ├── __init__.py           # 👈 Точка сборки всех роутеров
-# ├── standard_cmds.py      # Простые ответы (/help, /offer, /what, /where...)
-# ├── crud_cmds.py       # Личный кабинет: /config, /email (FSM)
-# ├── info_cmds.py          # Логика первых 3 кнопок: /what, /where, /when
-# └── ai_cmds.py            # Сложная логика: /ai_consultant

@@ -111,7 +111,7 @@ async def guide_cmd(message: Message, bot:Bot, session: AsyncSession):
 
 
 @info_router.message(Command("rules"))
-async def rules_cmd(message: Message, session: AsyncSession):
+async def rules_cmd(message: Message, bot:Bot, session: AsyncSession):
     if await closed_menu(message=message, session=session):
         return
     # # 1. Пытаемся отправить мгновенно через Redis (PRO способ)
@@ -161,7 +161,7 @@ async def rules_cmd(message: Message, session: AsyncSession):
 
 
 @info_router.message(Command("manual"))
-async def service_cmd(message: Message, session: AsyncSession):
+async def service_cmd(message: Message, bot:Bot, session: AsyncSession):
     if await closed_menu(message=message, session=session):
         return
     # # 1. Пытаемся отправить мгновенно через Redis (PRO способ)
@@ -239,7 +239,7 @@ async def process_next_rules_button(callback: CallbackQuery):
         # "\n\n<a href='https://www.wildberries.ru/catalog/191623733/detail.aspx?targetUrl=MI'>Смазка силиконовая "
         # "для колясок https://www.wildberries.ru/catalog/191623733/detail.aspx?targetUrl=MI</a>"
         "\n\nЕсли смазывать только коляску, то флакона хватит на пару лет"
-        "\n<blockquote><i>👆 Памятка сохранена в разделе</i> "
+        "\n<blockquote><i>👆 Если что памятка хранится в разделе</i> "
         "\n[👤 Мой профиль]</blockquote>"
         "\n\n/service - Встать на плановое ТО"
     )

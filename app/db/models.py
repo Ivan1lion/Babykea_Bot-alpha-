@@ -66,6 +66,7 @@ class User(Base):
     first_info_request: Mapped[bool] = mapped_column(Boolean, default=True)
     show_intro_message: Mapped[bool] = mapped_column(Boolean, default=True)
     is_active: Mapped[bool] = mapped_column(default=True)
+    subscribed_to_author: Mapped[bool] = mapped_column(default=True, server_default="true")
     wb_clicked_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
