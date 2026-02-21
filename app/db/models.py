@@ -24,7 +24,7 @@ class Magazine(Base):
         String(50),
         unique=True,
         index=True,
-        nullable=False
+        nullable=True
     )
     feed_url = Column(String, nullable=True)  # Ссылка на YML файл (может быть пустой - тогда ответы только из поиска)/ Если поставить "PREMIUM_AGGREGATOR", то идет поиск по всем фидам из векторной БД
     name: Mapped[str] = mapped_column(String(150), nullable=True)
