@@ -235,14 +235,14 @@ async def service_cmd(message: Message, bot:Bot, session: AsyncSession):
 
 
 @info_router.callback_query(F.data == "next_service")
-async def process_next_rules_button(callback: CallbackQuery):
+async def process_next_manual_button(callback: CallbackQuery):
     # 1. Удаляем сообщение с видео и кнопкой
     try:
         await callback.message.delete()
     except Exception as e:
         logger.error(f"Не удалось удалить сообщение: {e}")
 
-    # 2. Формируем текст с HTML разметкой
+    # 2. Формируем текст
     text = (
         "📌 <b>Памятка: 3 способа как не убить коляску</b>"
         "\n\n🚿 <b>Никакого душа</b>"
@@ -365,3 +365,34 @@ async def process_stroller_model(message: Message, state: FSMContext, session: A
     )
 
     await message.answer(text=success_text)
+
+
+
+#Реакция юзера на тестовое первое уведомление о плановом ТО
+@info_router.callback_query(F.data.in_(["to_feed_like", "to_feed_dislike"]))
+async def process_to_feedback(callback: CallbackQuery, session: AsyncSession):
+    user_id = callback.from_user.id
+
+    # 1. Определяем, что нажал юзер
+    feedback_value = "like" if callback.data == "to_feed_like" else "dislike"
+
+    # 2. Записываем результат в базу данных
+    stmt = (
+        update(User)
+        .where(User.telegram_id == user_id)
+        .values(first_to_feedback=feedback_value)
+    )
+    await session.execute(stmt)
+    await session.commit()
+
+    # 3. Убираем клавиатуру (кнопки исчезнут)
+    try:
+        await callback.message.edit_reply_markup(reply_markup=None)
+    except Exception:
+        pass  # Игнорируем ошибку, если вдруг сообщение уже старое
+
+    # 4. Отправляем всплывающее уведомление (alert)
+    if feedback_value == "like":
+        await callback.answer("Спасибо! Рад, что могу быть полезным 🤝", show_alert=True)
+    else:
+        await callback.answer("Спасибо за честный отзыв. Буду улучшать контент! 🤝", show_alert=True)

@@ -4,6 +4,7 @@ from datetime import datetime, timezone, timedelta
 from sqlalchemy import select, update
 from aiogram import Bot
 from aiogram.exceptions import TelegramForbiddenError, TelegramBadRequest
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 import logging
 
 from app.db.models import User
@@ -56,12 +57,32 @@ async def run_service_notifications(bot: Bot, session_maker):
                     if now >= target_date:
                         # ВРЕМЯ ПРИШЛО! Отправляем видео из тех канала
                         try:
-                            await bot.copy_message(
-                                chat_id=user.telegram_id,
-                                from_chat_id=tech_channel_id,
-                                message_id=stage["msg_id"],
-                                caption="🛠 Пришло время планового обслуживания вашей коляски!"
-                            )
+                            # 1. СЦЕНАРИЙ ДЛЯ ПЕРВОГО СООБЩЕНИЯ (service_level == 0)
+                            if user.service_level == 0:
+                                # Создаем кнопки лайк/дизлайк
+                                feedback_kb = InlineKeyboardMarkup(inline_keyboard=[
+                                    [
+                                        InlineKeyboardButton(text="👍", callback_data="to_feed_like"),
+                                        InlineKeyboardButton(text="👎", callback_data="to_feed_dislike")
+                                    ]
+                                ])
+
+                                await bot.copy_message(
+                                    chat_id=user.telegram_id,
+                                    from_chat_id=tech_channel_id,
+                                    message_id=stage["msg_id"],
+                                    reply_markup=feedback_kb,
+                                    caption="\u200b"
+                                )
+
+                            # 2. СЦЕНАРИЙ ДЛЯ ОСТАЛЬНЫХ СООБЩЕНИЙ (service_level > 0)
+                            else:
+                                await bot.copy_message(
+                                    chat_id=user.telegram_id,
+                                    from_chat_id=tech_channel_id,
+                                    message_id=stage["msg_id"],
+                                    caption="🛠 Пришло время планового обслуживания вашей коляски!"
+                                )
 
                             # Если успешно отправлено, повышаем уровень юзера в БД
                             user.service_level += 1

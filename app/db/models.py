@@ -62,6 +62,7 @@ class User(Base):
     subscribed_to_author: Mapped[bool] = mapped_column(default=True, server_default="true")
     wb_clicked_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), nullable=True)
     stroller_model: Mapped[str] = mapped_column(String(50), nullable=True)
+    first_to_feedback: Mapped[str] = mapped_column(String(20), nullable=True)
     service_registered_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), nullable=True)
     service_level: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     requests_left: Mapped[int] = mapped_column(Integer, default=1)
