@@ -110,10 +110,8 @@ async def guide_cmd(message: Message, bot:Bot, session: AsyncSession):
 
 
 
-@info_router.message(Command("rules"))
-async def rules_cmd(message: Message, bot:Bot, session: AsyncSession):
-    if await closed_menu(message=message, session=session):
-        return
+# Выносим всю логику отправки в отдельную функцию (DRY - Don't Repeat Yourself)
+async def send_rules_video(message: Message, bot: Bot):
     # # 1. Пытаемся отправить мгновенно через Redis (PRO способ)
     # # Мы ищем file_id, который сохранили под именем "rules_video"
     # === ПОПЫТКА 1: REDIS (Теперь безопасная) ===
@@ -156,6 +154,28 @@ async def rules_cmd(message: Message, bot:Bot, session: AsyncSession):
              f"\n\nRUTUBE - https://rutube.ru/"
              f"\n\nVK Видео - https://vkvideo.ru/"
     )
+
+
+# ХЭНДЛЕР 1: Реакция на команду /manual
+@info_router.message(Command("rules"))
+async def service_cmd(message: Message, bot: Bot, session: AsyncSession):
+    if await closed_menu(message=message, session=session):
+        return
+
+    # Передаем работу нашей функции
+    await send_rules_video(message, bot)
+
+
+# ХЭНДЛЕР 2: Реакция на инлайн-кнопку "rules_mode"
+@info_router.callback_query(F.data == "rules_mode")
+async def service_callback(callback: CallbackQuery, bot: Bot, session: AsyncSession):
+    # Обязательно отвечаем на коллбэк, чтобы у юзера пропали "часики" загрузки на кнопке
+    await callback.answer()
+
+    # Вызываем ту же самую функцию отправки!
+    # Передаем callback.message, чтобы видео улетело в правильный чат
+    await send_rules_video(callback.message, bot)
+
 
 
 

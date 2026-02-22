@@ -26,8 +26,8 @@ first_request = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text
 
 
 #Кнопка после активации бота, если пользователь branch == 'service_only'
-manual_mode = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="💢 Как не сломать коляску",
-                                                                         callback_data="manual_mode")]])
+rules_mode = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="💢 Как не сломать коляску",
+                                                                         callback_data="rules_mode")]])
 
 
 

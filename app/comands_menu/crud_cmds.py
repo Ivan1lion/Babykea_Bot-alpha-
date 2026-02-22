@@ -106,25 +106,36 @@ async def process_email_input(message: Message, state: FSMContext, session: Asyn
 
 @crud_router.message(Command("promo"))
 async def promo_cmd(message: Message, session: AsyncSession):
-    # 1. Достаем ТОЛЬКО промокод магазина, к которому привязан юзер
+    # Достаем промокод магазина И флаг активности
     stmt = (
-        select(Magazine.promo_code)
+        select(Magazine.promo_code, Magazine.is_promo_active)
         .select_from(User)
-        .outerjoin(Magazine)  # Безопасное присоединение через ForeignKey
+        .join(Magazine)  # INNER JOIN
         .where(User.telegram_id == message.from_user.id)
     )
 
     result = await session.execute(stmt)
-    # Получаем либо текст промокода магазина, либо None (если магазина нет)
-    mag_promo = result.scalar_one_or_none()
+    row = result.one_or_none()
+
+    # Юзера уже в базе, но еще активировал промо и не связался с магазином (страховка)
+    if not row:
+        await message.answer("Нет-нет! Сначала закончите настройку и активируйте доступ к боту")
+        return
+
+    mag_promo, is_promo_active = row
+
+    # Промокод деактивирован
+    if not is_promo_active:
+        await message.answer("Увы, срок действия Вашего промокода истек - им нельзя поделиться")
+        return
 
     # Настройки
     bot_link = "https://t.me/babykea_bot"
     photo_id = "AgACAgIAAyEGAATQjmD4AANnaY3ziPd3A8eUTwbZqo6-aqCuxmYAAmQaaxs1a3FI56_9NYQIxA0BAAMCAAN5AAM6BA"
 
-    # 2. СЦЕНАРИЙ 1: VIP-клиент (если VIP привязан к спец-магазину с кодом [BABYKEA_PREMIUM])
+    # VIP-клиент
     if mag_promo == "[BABYKEA_PREMIUM]":
-        share_promo = "BKEA-4K7X"  # Гостевой промокод (у меня в эксель записан первым)
+        share_promo = "BKEA-4K7X"
         caption = (
             f"👑 <b>У вас PREMIUM-доступ!</b>\n\n"
             f"Ваш аккаунт включает 50 запросов к AI-консультанту и глобальный поиск колясок по базам "
@@ -135,8 +146,8 @@ async def promo_cmd(message: Message, session: AsyncSession):
             f"{bot_link}"
         )
 
-    # 3. СЦЕНАРИЙ 2: Обычный пользователь (Берем актуальный код магазина)
-    elif mag_promo:
+    # Обычный пользователь
+    else:
         share_promo = mag_promo
         caption = (
             f"Ваш код активации: <b>{share_promo}</b>\n\n"
@@ -144,32 +155,24 @@ async def promo_cmd(message: Message, session: AsyncSession):
             f"{bot_link}"
         )
 
-    # 4. СЦЕНАРИЙ 3: Магазин не привязан, либо у магазина стерт промокод
-    else:
-        await message.answer("Ваш промо код истек - им нельзя поделиться")
-        return  # Выходим, чтобы не рисовать кнопку и картинку
-
-    # 5. Формируем текст для ДРУГА
+    # Формируем текст для друга
     share_text = (
-        f"🔍 Ищете коляску?\n"
+        f"\nИщете коляску?\n"
         f"Подберем надежную модель под ваши условия\n\n"
-        f"🛠 Уже купили?\n"
+        f"Уже купили?\n"
         f"Узнайте, как случайно не сломать её (80% поломок — вина владельцев!)\n\n"
-        f"{share_promo} - промокод для бесплатной активации (скопируйте его)"
+        f"🔑 Ваш код для бесплатного доступа:\n\n"
+        f"{share_promo}\n\n"
+        f"(скопируйте его)"
     )
 
-    # Обязательно кодируем текст для URL
     encoded_text = urllib.parse.quote(share_text)
-
-    # Специальная ссылка Telegram для шаринга
     share_url = f"https://t.me/share/url?url={bot_link}&text={encoded_text}"
 
-    # Создаем кнопку с url-переходом
     share_kb = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="↗️ Поделиться ссылкой", url=share_url)]
     ])
 
-    # Отправляем фото с текстом и кнопкой
     await message.answer_photo(
         photo=photo_id,
         caption=caption,
@@ -200,7 +203,7 @@ async def contacts_cmd(message: Message, session: AsyncSession):
         return
 
     # 🔹 Спец-логика для Babykea
-    if not magazine.name or magazine.name == "[Babykea]":
+    if magazine.name == "[Babykea]":
         await message.answer_photo(
             photo="https://i.postimg.cc/zBSgzjss/i.jpg",
             caption=(

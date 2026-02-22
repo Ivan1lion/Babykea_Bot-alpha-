@@ -19,13 +19,13 @@ class Magazine(Base):
     __tablename__ = "magazines"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-
     promo_code: Mapped[str] = mapped_column(
         String(50),
         unique=True,
         index=True,
-        nullable=True
+        nullable=False
     )
+    is_promo_active: Mapped[bool] = mapped_column(default=True, server_default="true")
     feed_url = Column(String, nullable=True)  # Ссылка на YML файл (может быть пустой - тогда ответы только из поиска)/ Если поставить "PREMIUM_AGGREGATOR", то идет поиск по всем фидам из векторной БД
     name: Mapped[str] = mapped_column(String(150), nullable=True)
     city: Mapped[str] = mapped_column(String(100), nullable=True)
