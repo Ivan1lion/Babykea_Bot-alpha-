@@ -5,11 +5,12 @@ from aiogram.types import Message, CallbackQuery
 from aiogram.exceptions import TelegramBadRequest
 from aiogram.filters import Command, StateFilter
 from aiogram.fsm.context import FSMContext
+from datetime import datetime, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update
 from sqlalchemy.sql import func
-from app.db.models import User
 
+from app.db.models import User
 from app.db.crud import closed_menu
 import app.handlers.keyboards as kb
 from app.redis_client import redis_client
@@ -329,12 +330,16 @@ async def process_stroller_model(message: Message, state: FSMContext, session: A
     user_model = message.text
     user_id = message.from_user.id
 
-    # 1. Записываем модель коляски в БД (колонка stroller_model)
+    # 1. Записываем модель, время старта и обнуляем уровень рассылки
     try:
         stmt = (
             update(User)
             .where(User.telegram_id == user_id)
-            .values(stroller_model=user_model)
+            .values(
+                stroller_model=user_model,
+                service_registered_at=datetime.now(timezone.utc), # Фиксируем точное время
+                service_level=0 # Сбрасываем счетчик сообщений
+            )
         )
         await session.execute(stmt)
         await session.commit()
@@ -353,7 +358,10 @@ async def process_stroller_model(message: Message, state: FSMContext, session: A
         f"<b>Модель:</b> <i>{user_model}</i>\n\n"
         "Уведомление придет, когда настанет время для ТО. "
         "Система учитывает особенности вашей модели и текущее время года, "
-        "чтобы напомнить о профилактике ровно тогда, когда это действительно необходимо 🗓"
+        "чтобы напомнить о профилактике ровно тогда, когда это действительно необходимо 🗓\n\n"
+        "<b>Мониторинг запущен</b> ⚙️\n"
+        "<blockquote>Главное — не удаляйте этот чат и не перезагружайте бота, иначе данные о пробеге и индивидуальные "
+        "настройки вашей коляски обнулятся</blockquote>"
     )
 
     await message.answer(text=success_text)

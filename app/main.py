@@ -23,6 +23,7 @@ from app.comands_menu.standard_cmds import bot_menu
 from app.comands_menu import menu_cmds_router
 from app.payments.payment_routes import yookassa_webhook_handler
 from app.redis_client import redis_client as redis
+from app.services.service_worker import run_service_notifications
 
 
 
@@ -133,6 +134,12 @@ async def main():
     await site.start()
     print(f"Bot is running on {WEBAPP_HOST}:{WEBAPP_PORT}")
     print(f"Webhook URL: {WEBHOOK_URL}")
+    # =================================================================
+    # 🔥 ЗАПУСКАЕМ НАШ ФОНОВЫЙ ВОРКЕР ТЕХ. ОБСЛУЖИВАНИЯ 🔥
+    # Делаем это через create_task, чтобы он работал параллельно
+    # и не мешал веб-серверу принимать входящие запросы.
+    # =================================================================
+    asyncio.create_task(run_service_notifications(bot, session_maker))
     # Держим процесс живым
     await asyncio.Event().wait()
 
