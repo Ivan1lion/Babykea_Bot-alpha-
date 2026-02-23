@@ -837,6 +837,7 @@ async def process_payment(
         await callback.message.answer(
             cfg["message"],
             reply_markup=payment_button_keyboard(confirmation_url),
+            disable_web_page_preview=True,
         )
         await callback.answer()
 

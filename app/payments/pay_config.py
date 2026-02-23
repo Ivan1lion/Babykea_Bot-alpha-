@@ -41,6 +41,11 @@ PAYMENTS = {
             "\n«🤖 AI-консультанту»"
             "\n\n<blockquote>Оплата производится через Yoomoney (ЮKassa) — "
             "сервис безопасных платежей ПАО «Сбербанк»</blockquote>"
+            "\n\n<i>Переходя к оплате, вы принимаете условия "
+            "<a href='https://telegra.ph/PUBLICHNAYA-OFERTA-na-predostavlenie-prava-ispolzovaniya-"
+            "funkcionala-Telegram-bota-Babykea-Bot-i-informacionnyh-materialov-02-23'>Оферты</a> и соглашаетесь с "
+            "<a href='https://telegra.ph/POLITIKA-KONFIDENCIALNOSTI-polzovatelej-Telegram-bota-Babykea-"
+            "Bot-02-23'>Политикой конфиденциальности</a></i>"
         ),
     },
 }

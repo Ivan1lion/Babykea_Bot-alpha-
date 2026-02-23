@@ -138,7 +138,10 @@ async def process_toggle_blog_sub(callback: CallbackQuery, session: AsyncSession
 
 @standard_router.message(Command("offer"))
 async def offer_cmd(message: Message):
-    text_offer = (f"1. <a href='https://telegra.ph/Oferta-dlya-chat-bota-Babykea-Bot-Babykea-07-14'>Публичная оферта, "
+    text_offer = (f"1. <a href='https://telegra.ph/PUBLICHNAYA-OFERTA-na-predostavlenie-prava-ispolzovaniya-"
+                  f"funkcionala-Telegram-bota-Babykea-Bot-i-informacionnyh-materialov-02-23'>Публичная оферта, "
                   f"Пользовательское соглашение, условия эксплуатации и обслуживания</a>\n\n"
-                  f"2. <a href='https://telegra.ph/Politika-konfidencialnosti-07-26-9'>Политика Конфиденциальности</a>")
+                  f"2. <a href='https://telegra.ph/POLITIKA-KONFIDENCIALNOSTI-polzovatelej-Telegram-bota-Babykea-"
+                  f"Bot-02-23'>Политика Конфиденциальности</a>\n\n"
+                  f"/email - указать email для получения чеков")
     await message.answer(text=text_offer, link_preview_options=LinkPreviewOptions(is_disabled=True))
