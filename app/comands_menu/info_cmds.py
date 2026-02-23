@@ -25,6 +25,7 @@ tech_channel_id = int(os.getenv("TECH_CHANNEL_ID"))
 guide_post = int(os.getenv("GUIDE_POST"))
 rules_post = int(os.getenv("RULES_POST"))
 manual_post = int(os.getenv("MANUAL_POST"))
+manual2_post = int(os.getenv("MANUAL2_POST"))
 
 
 @info_router.message(Command("guide"))
@@ -264,14 +265,44 @@ async def process_next_manual_button(callback: CallbackQuery):
         "\n[👤 Мой профиль]</blockquote>"
         "\n\n/service - Встать на плановое ТО"
     )
-    # 3. Отправляем новое сообщение (disable_web_page_preview убирает огромное превью от ссылки на WB)
+
+    # 3. Отправка видео-кружка
+    video_sent = False
+
+    # Попытка 1: Берем file_id из Redis (замените "media:service_video" на ваш ключ)
+    video_note_id = await redis_client.get("media:manual2_video")
+
+    if video_note_id:
+        try:
+            await callback.message.answer_video_note(video_note=video_note_id)
+            video_sent = True
+        except Exception as e:
+            logger.error(f"Ошибка отправки video_note из Redis: {e}")
+
+    # Попытка 2: Fallback — копируем из тех. канала, если Redis пуст или выдал ошибку
+    if not video_sent:
+        try:
+            await bot.copy_message(
+                chat_id=callback.message.chat.id,
+                from_chat_id=tech_channel_id,
+                message_id=manual2_post,
+            )
+        except Exception as e:
+            logger.error(f"Ошибка копирования кружка из канала: {e}")
+
+    # 4. Пауза для сохранения визуального порядка (кружок -> текст)
+    await asyncio.sleep(1)
+
+    # 5. Отправляем новое сообщение (disable_web_page_preview убирает огромное превью от ссылки на WB)
     await callback.message.answer(
         text=text,
         reply_markup=kb.get_wb_link,
         disable_web_page_preview=True
     )
-    # 4. "Гасим" часики загрузки на нажатой кнопке
+
+    # 6. "Гасим" часики на кнопке
     await callback.answer()
+
 
 
 
