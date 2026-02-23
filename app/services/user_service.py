@@ -56,6 +56,67 @@ async def get_user_cached(session: AsyncSession, telegram_id: int) -> UserCache 
     return user_dto
 
 
+
+
+async def try_reserve_request(session: AsyncSession, telegram_id: int) -> bool:
+    """
+    Атомарно резервирует 1 запрос прямо в БД.
+
+    Использует UPDATE ... WHERE requests_left > 0 — PostgreSQL гарантирует,
+    что при одновременных вызовах только один из них пройдёт успешно.
+
+    Возвращает True если запрос успешно зарезервирован, False если баланс исчерпан.
+    Вызывать ДО запуска фоновой задачи, чтобы исключить race condition.
+    """
+    stmt = (
+        update(User)
+        .where(
+            User.telegram_id == telegram_id,
+            User.requests_left > 0  # Атомарная защита от гонки
+        )
+        .values(requests_left=User.requests_left - 1)
+        .returning(User.id)
+    )
+    result = await session.execute(stmt)
+    await session.commit()
+
+    reserved = result.scalar_one_or_none()
+
+    if reserved:
+        # Инвалидируем кэш — старый баланс больше неактуален
+        await redis_client.delete(f"user:{telegram_id}")
+        logger.debug(f"✅ Request reserved for user {telegram_id}")
+        return True
+
+    logger.debug(f"❌ Reserve failed (balance = 0) for user {telegram_id}")
+    return False
+
+
+async def refund_request(telegram_id: int):
+    """
+    Возвращает 1 запрос юзеру при ошибке LLM.
+    Использует собственную сессию — вызывается из except-блока фоновой задачи,
+    где оригинальная сессия уже могла быть закрыта или в невалидном состоянии.
+    """
+    from app.db.config import session_maker  # Локальный импорт во избежание циклов
+    try:
+        async with session_maker() as session:
+            stmt = (
+                update(User)
+                .where(User.telegram_id == telegram_id)
+                .values(requests_left=User.requests_left + 1)
+            )
+            await session.execute(stmt)
+            await session.commit()
+            await redis_client.delete(f"user:{telegram_id}")
+            logger.info(f"↩️ Refund: вернули 1 запрос юзеру {telegram_id}")
+    except Exception as e:
+        logger.error(f"❌ Refund failed для юзера {telegram_id}: {e}")
+
+
+
+
+
 async def update_user_requests(session: AsyncSession, telegram_id: int, decrement: int = 1):
     """
     Списывает баланс. Обновляет И базу, И кэш.

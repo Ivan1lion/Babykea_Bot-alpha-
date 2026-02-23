@@ -34,7 +34,7 @@ from app.openai_assistant.responses_client import ask_responses_api
 from app.openai_assistant.prompts_config import get_system_prompt, get_marketing_footer
 from app.payments.pay_config import PAYMENTS
 from app.services.search_service import search_products
-from app.services.user_service import get_user_cached, update_user_requests, update_user_flags
+from app.services.user_service import get_user_cached, update_user_requests, update_user_flags, try_reserve_request, refund_request
 from app.redis_client import redis_client
 
 
@@ -250,6 +250,7 @@ async def process_promo_code(
             f'✅ Проведена успешная активация по промокоду магазина детских колясок {magazine_display}\n\n'
             f'Контакты продавца будут находиться в меню в разделе\n'
             f'[📍 Магазин колясок]'
+            f'\n\nТеперь проверим бота в деле 👇'
         )
     else:
         # 4. ФИНАЛЬНЫЙ ТЕКСТ (Если имя магазина пустое / None или = "[Babykea]")
@@ -281,148 +282,377 @@ async def send_typing(bot, chat_id, stop_event):
 # ==========================================
 # 0. ОБРАБОТКА КНОПКИ "ПОДОБРАТЬ КОЛЯСКУ" (АВТО-ЗАПРОС)
 # ==========================================
+
+async def _run_auto_request_task(
+    bot: Bot,
+    chat_id: int,
+    telegram_id: int,
+    typing_msg_id: int,
+    user_id: int,
+    magazine_id,
+    first_catalog_request: bool,
+):
+    """
+    Фоновая задача для обработки авто-запроса "Подобрать коляску".
+    Запускается через asyncio.create_task — хэндлер не ждёт её завершения,
+    Telegram сразу получает 200 OK.
+    Использует собственную сессию БД, т.к. сессия хэндлера закрывается раньше.
+    """
+    stop_event = asyncio.Event()
+    typing_task = asyncio.create_task(send_typing(bot, chat_id, stop_event))
+
+    try:
+        async with session_maker() as session:
+            # --- СБОР ДАННЫХ О МАГАЗИНЕ ---
+            mag_result = await session.execute(select(Magazine).where(Magazine.id == magazine_id))
+            current_magazine = mag_result.scalar_one_or_none()
+
+            # --- СБОР ДАННЫХ КВИЗА ---
+            quiz_data_str = "Нет данных."
+            quiz_json_obj = {}
+
+            quiz_result = await session.execute(
+                select(UserQuizProfile)
+                .where(UserQuizProfile.user_id == user_id)
+                .order_by(UserQuizProfile.id.desc())
+                .limit(1)
+            )
+            quiz_profile = quiz_result.scalar_one_or_none()
+
+            if quiz_profile:
+                try:
+                    if isinstance(quiz_profile.data, str):
+                        quiz_json_obj = json.loads(quiz_profile.data)
+                        quiz_data_str = quiz_profile.data
+                    else:
+                        quiz_json_obj = quiz_profile.data
+                        quiz_data_str = json.dumps(quiz_profile.data, ensure_ascii=False)
+                except Exception:
+                    pass
+
+            # --- ПОИСК В БАЗЕ ---
+            products_context = ""
+            final_shop_url = None
+
+            if current_magazine:
+                feed_url = current_magazine.feed_url
+
+                if feed_url and "http" in feed_url:
+                    products_context = await search_products(
+                        user_query="",
+                        quiz_json=quiz_json_obj,
+                        allowed_magazine_ids=current_magazine.id,
+                        top_k=10
+                    )
+                elif feed_url == "PREMIUM_AGGREGATOR":
+                    products_context = await search_products(
+                        user_query="",
+                        quiz_json=quiz_json_obj,
+                        allowed_magazine_ids=TOP_SHOPS_IDS,
+                        top_k=10
+                    )
+                else:
+                    final_shop_url = current_magazine.url_website
+                    logger.warning(f"⚠️ У магазина '{current_magazine.name}' нет YML. Поиск по сайту: {final_shop_url}")
+            else:
+                products_context = await search_products(
+                    user_query="",
+                    quiz_json=quiz_json_obj,
+                    allowed_magazine_ids=TOP_SHOPS_IDS,
+                    top_k=10
+                )
+
+            # --- ГЕНЕРАЦИЯ ОТВЕТА (долгая операция) ---
+            system_prompt = get_system_prompt(
+                mode="catalog_mode",
+                quiz_data=quiz_data_str,
+                shop_url=final_shop_url,
+                products_context=products_context
+            )
+
+            answer = await ask_responses_api(
+                user_message="Подбери мне подходящую коляску",
+                system_instruction=system_prompt
+            )
+
+            # --- ФУТЕР ---
+            if first_catalog_request:
+                answer += get_marketing_footer("catalog_mode")
+
+            # --- УДАЛЯЕМ СООБЩЕНИЕ "Анализирую..." ---
+            with contextlib.suppress(Exception):
+                await bot.delete_message(chat_id=chat_id, message_id=typing_msg_id)
+
+            # --- ОТПРАВКА ОТВЕТА ---
+            try:
+                await bot.send_message(chat_id, answer, parse_mode=ParseMode.HTML, disable_web_page_preview=True)
+            except Exception:
+                await bot.send_message(chat_id, answer, parse_mode=None, disable_web_page_preview=True)
+
+            # --- СОХРАНЕНИЕ В БД (только флаги, запрос уже списан атомарно в хэндлере) ---
+            await update_user_flags(session, telegram_id, closed_menu_flag=False, first_catalog_request=False)
+
+    except Exception as e:
+        logger.error(f"Error in _run_auto_request_task: {e}", exc_info=True)
+        # Возвращаем запрос — он был списан авансом, но LLM не ответил
+        await refund_request(telegram_id)
+        with contextlib.suppress(Exception):
+            await bot.delete_message(chat_id=chat_id, message_id=typing_msg_id)
+        with contextlib.suppress(Exception):
+            await bot.send_message(chat_id, "⚠️ Произошла ошибка на сервере. Запрос не списан, попробуйте ещё раз.")
+    finally:
+        stop_event.set()
+        typing_task.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await typing_task
+
+
 @for_user_router.callback_query(F.data == "first_request")
 async def process_first_auto_request(call: CallbackQuery, state: FSMContext, session: AsyncSession, bot: Bot):
-    await call.answer()
-    # 2. Переключаем режим сразу на "Каталог"
+    # === 1. FSM-БЛОКИРОВКА ОТ ДВОЙНОГО КЛИКА ===
+    current_state = await state.get_state()
+    if current_state == AIChat.catalog_mode.state:
+        # Если юзер уже нажал кнопку и ждет — показываем всплывающее уведомление
+        await call.answer("⏳ Пожалуйста, подождите. Я уже ищу для вас коляску!", show_alert=True)
+        return
+
+    # Переключаем режим (ставим FSM-блокировку)
     await state.set_state(AIChat.catalog_mode)
+    await call.answer()
 
-    # 3. Получаем юзера
-    # Молниеносные запросы в БД через кэш Redis (что бы снять нагрузку из-за частых, однотипных обращений в БД)
+    # === 2. УДАЛЕНИЕ КНОПКИ ИЗ ИНТЕРФЕЙСА (UX) ===
+    try:
+        # Убираем клавиатуру (кнопку), но оставляем сам текст сообщения
+        await call.message.edit_reply_markup(reply_markup=None)
+
+        # Или, если хотите удалить сообщение с кнопкой целиком, раскомментируйте строку ниже:
+        # await call.message.delete()
+    except Exception as e:
+        pass  # Игнорируем ошибку, если сообщение уже удалено/изменено
+
+    # === 3. ПОЛУЧЕНИЕ ЮЗЕРА ===
     user = await get_user_cached(session, call.from_user.id)
-    if not user: return
+    if not user:
+        await state.clear()  # Снимаем блокировку
+        return
 
-    # Проверка лимитов
-    if user.requests_left <= 0:
-        await call.message.answer(  # Исправил message.answer на call.message.answer
+    # === 4. SQL-БЛОКИРОВКА (Резервирование баланса) ===
+    reserved = await try_reserve_request(session, call.from_user.id)
+    if not reserved:
+        await state.clear()  # Снимаем блокировку
+        await call.message.answer(
             f"💡 Чтобы я мог выдать точный результат и завершить персональный анализ под ваши условия, выберите "
-            f"пакет запросов ниже"
-            f"\n\n<a href='https://telegra.ph/AI-konsultant-rabotaet-na-platnoj-platforme-httpsplatformopenaicom-01-16'>"
-            "(Как это работает и что считается запросом?)</a>",
+            f"пакет запросов ниже\n\n"
+            f"<a href='https://telegra.ph/AI-konsultant-rabotaet-na-platnoj-platforme-httpsplatformopenaicom-01-16'>"
+            f"(Как это работает и что считается запросом?)</a>",
             reply_markup=kb.pay
         )
         return
 
-    # 4. Визуальная индикация работы
+    # === 5. ИНДИКАЦИЯ И ЗАПУСК ЗАДАЧИ ===
     typing_msg = await call.message.answer("🔍 Анализирую ваши ответы из квиза и ищу лучшее решение...")
 
-    # Запускаем "печатание"
-    stop_event = asyncio.Event()
-    typing_task = asyncio.create_task(send_typing(bot, call.message.chat.id, stop_event))
-
-    try:
-        # --- СБОР ДАННЫХ ---
-        mag_result = await session.execute(select(Magazine).where(Magazine.id == user.magazine_id))
-        current_magazine = mag_result.scalar_one_or_none()
-
-        # Достаем ответы на квиз
-        quiz_data_str = "Нет данных."
-        quiz_json_obj = {}
-        user_branch = "pregnant"
-
-        quiz_result = await session.execute(
-            select(UserQuizProfile).where(UserQuizProfile.user_id == user.id).order_by(UserQuizProfile.id.desc()).limit(
-                1)
+    # Запускаем тяжёлую работу в фоне — не ждём её завершения
+    asyncio.create_task(
+        _run_auto_request_task(
+            bot=bot,
+            chat_id=call.message.chat.id,
+            telegram_id=call.from_user.id,
+            typing_msg_id=typing_msg.message_id,
+            user_id=user.id,
+            magazine_id=user.magazine_id,
+            first_catalog_request=user.first_catalog_request,
         )
-        quiz_profile = quiz_result.scalar_one_or_none()
+    )
+#⚠️⚠️⚠️⚠️⚠️⚠️ Восстановить если код выше хуйня
+# @for_user_router.callback_query(F.data == "first_request")
+# async def process_first_auto_request(call: CallbackQuery, state: FSMContext, session: AsyncSession, bot: Bot):
+#     await call.answer()
+#     # Переключаем режим сразу на "Каталог"
+#     await state.set_state(AIChat.catalog_mode)
+#
+#     # Получаем юзера через кэш Redis
+#     user = await get_user_cached(session, call.from_user.id)
+#     if not user:
+#         return
+#
+#     # Атомарно резервируем запрос в БД.
+#     # WHERE requests_left > 0 гарантирует: даже при 10 одновременных кликах
+#     # только один пройдёт, остальные получат False.
+#     reserved = await try_reserve_request(session, call.from_user.id)
+#     if not reserved:
+#         await call.message.answer(
+#             f"💡 Чтобы я мог выдать точный результат и завершить персональный анализ под ваши условия, выберите "
+#             f"пакет запросов ниже"
+#             f"\n\n<a href='https://telegra.ph/AI-konsultant-rabotaet-na-platnoj-platforme-httpsplatformopenaicom-01-16'>"
+#             "(Как это работает и что считается запросом?)</a>",
+#             reply_markup=kb.pay
+#         )
+#         return
+#
+#     # Отправляем индикацию — хэндлер на этом заканчивается, Telegram получает 200 OK
+#     typing_msg = await call.message.answer("🔍 Анализирую ваши ответы из квиза и ищу лучшее решение...")
+#
+#     # Запускаем тяжёлую работу в фоне — не ждём её завершения
+#     asyncio.create_task(
+#         _run_auto_request_task(
+#             bot=bot,
+#             chat_id=call.message.chat.id,
+#             telegram_id=call.from_user.id,
+#             typing_msg_id=typing_msg.message_id,
+#             user_id=user.id,
+#             magazine_id=user.magazine_id,
+#             first_catalog_request=user.first_catalog_request,
+#         )
+#     )
 
-        if quiz_profile:
-            if quiz_profile.branch:
-                user_branch = quiz_profile.branch
-            try:
-                if isinstance(quiz_profile.data, str):
-                    quiz_json_obj = json.loads(quiz_profile.data)
-                    quiz_data_str = quiz_profile.data
-                else:
-                    quiz_json_obj = quiz_profile.data
-                    quiz_data_str = json.dumps(quiz_profile.data, ensure_ascii=False)
-            except:
-                pass
 
-        # --- ПОИСК В БАЗЕ (ОБНОВЛЕННАЯ ЛОГИКА) ---
-        products_context = ""
-        final_shop_url = None
 
-        if current_magazine:
-            feed_url = current_magazine.feed_url
 
-            # Условие 1: Если есть конкретная ссылка на YML (Обычный магазин)
-            if feed_url and "http" in feed_url:
-                products_context = await search_products(
-                    user_query="",  # <--- ПУСТОЙ ЗАПРОС (только квиз)
-                    quiz_json=quiz_json_obj,
-                    allowed_magazine_ids=current_magazine.id,  # Ищем только у него
-                    top_k=10
-                )
 
-            # Условие 3: Если это "Технический магазин" для платных (поиск по ТОП-5)
-            # В базе у такого магазина в feed_url должно быть написано "PREMIUM_AGGREGATOR"
-            elif feed_url == "PREMIUM_AGGREGATOR":
-                products_context = await search_products(
-                    user_query="",
-                    quiz_json=quiz_json_obj,
-                    allowed_magazine_ids=TOP_SHOPS_IDS,  # 🔥 Ищем по списку ТОП-5
-                    top_k=10
-                )
 
-            # Условие 2: Если feed_url пустой -> Векторный поиск отключен
-            else:
-                final_shop_url = current_magazine.url_website
-                # print для логов, чтобы видеть, что сработала ветка Гугла
-                print(f"⚠️ У магазина '{current_magazine.name}' нет YML. Используем поиск по сайту: {final_shop_url}")
-
-        else:
-            # Fallback: Если магазин вообще не привязан -> Ищем по ТОП-5
-            products_context = await search_products(
-                user_query="",
-                quiz_json=quiz_json_obj,
-                allowed_magazine_ids=TOP_SHOPS_IDS,
-                top_k=10
-            )
-
-        # --- ГЕНЕРАЦИЯ ОТВЕТА ---
-        system_prompt = get_system_prompt(
-            mode="catalog_mode",
-            quiz_data=quiz_data_str,
-            shop_url=final_shop_url,  # Если заполнился (Условие 2), AI будет знать, куда идти
-            products_context=products_context
-        )
-
-        fake_user_message = "Подбери мне подходящую коляску"
-
-        answer = await ask_responses_api(
-            user_message=fake_user_message,
-            system_instruction=system_prompt
-        )
-
-        # --- ФУТЕР (Маркетинг) ---
-        if user.first_catalog_request:
-            marketing_footer = get_marketing_footer("catalog_mode")
-            answer += marketing_footer
-            user.first_catalog_request = False  # Сжигаем только его
-
-        # --- ОТПРАВКА ---
-        await typing_msg.delete()
-
-        try:
-            await call.message.answer(answer, parse_mode=ParseMode.HTML, disable_web_page_preview=True)
-        except Exception:
-            await call.message.answer(answer, parse_mode=None, disable_web_page_preview=True)
-
-        # Списываем запрос и снимаем флаг для доступа к меню
-        # --- 🔥 ФИНАЛЬНОЕ СОХРАНЕНИЕ (Используем сервисы) ---
-        # 1. Списываем запрос (обновит БД и Кэш)
-        await update_user_requests(session, user.telegram_id, decrement=1)
-        # 2. Обновляем флаг closed_menu_flag и first_catalog_request
-        await update_user_flags(session, user.telegram_id, closed_menu_flag=False, first_catalog_request=False)
-
-    except Exception as e:
-        logger.error(f"Error in auto-request: {e}", exc_info=True)
-        await call.message.answer("⚠️ Произошла ошибка на сервере. Нажмите кнопку еще раз.")
-    finally:
-        stop_event.set()
-        typing_task.cancel()
-        await state.clear()
+# @for_user_router.callback_query(F.data == "first_request")
+# async def process_first_auto_request(call: CallbackQuery, state: FSMContext, session: AsyncSession, bot: Bot):
+#     await call.answer()
+#     # 2. Переключаем режим сразу на "Каталог"
+#     await state.set_state(AIChat.catalog_mode)
+#
+#     # 3. Получаем юзера
+#     # Молниеносные запросы в БД через кэш Redis (что бы снять нагрузку из-за частых, однотипных обращений в БД)
+#     user = await get_user_cached(session, call.from_user.id)
+#     if not user: return
+#
+#     # Проверка лимитов
+#     if user.requests_left <= 0:
+#         await call.message.answer(  # Исправил message.answer на call.message.answer
+#             f"💡 Чтобы я мог выдать точный результат и завершить персональный анализ под ваши условия, выберите "
+#             f"пакет запросов ниже"
+#             f"\n\n<a href='https://telegra.ph/AI-konsultant-rabotaet-na-platnoj-platforme-httpsplatformopenaicom-01-16'>"
+#             "(Как это работает и что считается запросом?)</a>",
+#             reply_markup=kb.pay
+#         )
+#         return
+#
+#     # 4. Визуальная индикация работы
+#     typing_msg = await call.message.answer("🔍 Анализирую ваши ответы из квиза и ищу лучшее решение...")
+#
+#     # Запускаем "печатание"
+#     stop_event = asyncio.Event()
+#     typing_task = asyncio.create_task(send_typing(bot, call.message.chat.id, stop_event))
+#
+#     try:
+#         # --- СБОР ДАННЫХ ---
+#         mag_result = await session.execute(select(Magazine).where(Magazine.id == user.magazine_id))
+#         current_magazine = mag_result.scalar_one_or_none()
+#
+#         # Достаем ответы на квиз
+#         quiz_data_str = "Нет данных."
+#         quiz_json_obj = {}
+#         user_branch = "pregnant"
+#
+#         quiz_result = await session.execute(
+#             select(UserQuizProfile).where(UserQuizProfile.user_id == user.id).order_by(UserQuizProfile.id.desc()).limit(
+#                 1)
+#         )
+#         quiz_profile = quiz_result.scalar_one_or_none()
+#
+#         if quiz_profile:
+#             if quiz_profile.branch:
+#                 user_branch = quiz_profile.branch
+#             try:
+#                 if isinstance(quiz_profile.data, str):
+#                     quiz_json_obj = json.loads(quiz_profile.data)
+#                     quiz_data_str = quiz_profile.data
+#                 else:
+#                     quiz_json_obj = quiz_profile.data
+#                     quiz_data_str = json.dumps(quiz_profile.data, ensure_ascii=False)
+#             except:
+#                 pass
+#
+#         # --- ПОИСК В БАЗЕ (ОБНОВЛЕННАЯ ЛОГИКА) ---
+#         products_context = ""
+#         final_shop_url = None
+#
+#         if current_magazine:
+#             feed_url = current_magazine.feed_url
+#
+#             # Условие 1: Если есть конкретная ссылка на YML (Обычный магазин)
+#             if feed_url and "http" in feed_url:
+#                 products_context = await search_products(
+#                     user_query="",  # <--- ПУСТОЙ ЗАПРОС (только квиз)
+#                     quiz_json=quiz_json_obj,
+#                     allowed_magazine_ids=current_magazine.id,  # Ищем только у него
+#                     top_k=10
+#                 )
+#
+#             # Условие 3: Если это "Технический магазин" для платных (поиск по ТОП-5)
+#             # В базе у такого магазина в feed_url должно быть написано "PREMIUM_AGGREGATOR"
+#             elif feed_url == "PREMIUM_AGGREGATOR":
+#                 products_context = await search_products(
+#                     user_query="",
+#                     quiz_json=quiz_json_obj,
+#                     allowed_magazine_ids=TOP_SHOPS_IDS,  # 🔥 Ищем по списку ТОП-5
+#                     top_k=10
+#                 )
+#
+#             # Условие 2: Если feed_url пустой -> Векторный поиск отключен
+#             else:
+#                 final_shop_url = current_magazine.url_website
+#                 # print для логов, чтобы видеть, что сработала ветка Гугла
+#                 print(f"⚠️ У магазина '{current_magazine.name}' нет YML. Используем поиск по сайту: {final_shop_url}")
+#
+#         else:
+#             # Fallback: Если магазин вообще не привязан -> Ищем по ТОП-5
+#             products_context = await search_products(
+#                 user_query="",
+#                 quiz_json=quiz_json_obj,
+#                 allowed_magazine_ids=TOP_SHOPS_IDS,
+#                 top_k=10
+#             )
+#
+#         # --- ГЕНЕРАЦИЯ ОТВЕТА ---
+#         system_prompt = get_system_prompt(
+#             mode="catalog_mode",
+#             quiz_data=quiz_data_str,
+#             shop_url=final_shop_url,  # Если заполнился (Условие 2), AI будет знать, куда идти
+#             products_context=products_context
+#         )
+#
+#         fake_user_message = "Подбери мне подходящую коляску"
+#
+#         answer = await ask_responses_api(
+#             user_message=fake_user_message,
+#             system_instruction=system_prompt
+#         )
+#
+#         # --- ФУТЕР (Маркетинг) ---
+#         if user.first_catalog_request:
+#             marketing_footer = get_marketing_footer("catalog_mode")
+#             answer += marketing_footer
+#             user.first_catalog_request = False  # Сжигаем только его
+#
+#         # --- ОТПРАВКА ---
+#         await typing_msg.delete()
+#
+#         try:
+#             await call.message.answer(answer, parse_mode=ParseMode.HTML, disable_web_page_preview=True)
+#         except Exception:
+#             await call.message.answer(answer, parse_mode=None, disable_web_page_preview=True)
+#
+#         # Списываем запрос и снимаем флаг для доступа к меню
+#         # --- 🔥 ФИНАЛЬНОЕ СОХРАНЕНИЕ (Используем сервисы) ---
+#         # 1. Списываем запрос (обновит БД и Кэш)
+#         await update_user_requests(session, user.telegram_id, decrement=1)
+#         # 2. Обновляем флаг closed_menu_flag и first_catalog_request
+#         await update_user_flags(session, user.telegram_id, closed_menu_flag=False, first_catalog_request=False)
+#
+#     except Exception as e:
+#         logger.error(f"Error in auto-request: {e}", exc_info=True)
+#         await call.message.answer("⚠️ Произошла ошибка на сервере. Нажмите кнопку еще раз.")
+#     finally:
+#         stop_event.set()
+#         typing_task.cancel()
+#         await state.clear()
 
 
 
@@ -452,21 +682,159 @@ async def process_mode_selection(callback: CallbackQuery, state: FSMContext):
 # ==========================================
 # 2. ОБРАБОТКА ТЕКСТА (С УЧЕТОМ РЕЖИМА)
 # ==========================================
+async def _run_ai_message_task(
+    bot: Bot,
+    chat_id: int,
+    telegram_id: int,
+    user_text: str,
+    typing_msg_id: int,
+    user_id: int,
+    magazine_id,
+    is_catalog_mode: bool,
+    first_catalog_request: bool,
+    first_info_request: bool,
+):
+    """
+    Фоновая задача для обработки текстового запроса к AI.
+    Запускается через asyncio.create_task — хэндлер не ждёт её завершения,
+    Telegram сразу получает 200 OK.
+    Использует собственную сессию БД.
+    """
+    stop_event = asyncio.Event()
+    typing_task = asyncio.create_task(send_typing(bot, chat_id, stop_event))
+
+    try:
+        async with session_maker() as session:
+            # --- СБОР ДАННЫХ О МАГАЗИНЕ ---
+            mag_result = await session.execute(select(Magazine).where(Magazine.id == magazine_id))
+            current_magazine = mag_result.scalar_one_or_none()
+
+            quiz_data_str = "Нет данных."
+            quiz_json_obj = {}
+
+            quiz_result = await session.execute(
+                select(UserQuizProfile)
+                .where(UserQuizProfile.user_id == user_id)
+                .order_by(UserQuizProfile.id.desc())
+                .limit(1)
+            )
+            quiz_profile = quiz_result.scalar_one_or_none()
+
+            if quiz_profile:
+                try:
+                    if isinstance(quiz_profile.data, str):
+                        quiz_json_obj = json.loads(quiz_profile.data)
+                        quiz_data_str = quiz_profile.data
+                    else:
+                        quiz_json_obj = quiz_profile.data
+                        quiz_data_str = json.dumps(quiz_profile.data, ensure_ascii=False)
+                except Exception:
+                    pass
+
+            # --- ЛОГИКА ПОИСКА (ТОЛЬКО ДЛЯ CATALOG MODE) ---
+            products_context = ""
+            final_shop_url = None
+
+            if is_catalog_mode:
+                if current_magazine:
+                    feed_url = current_magazine.feed_url
+
+                    if feed_url and "http" in feed_url:
+                        products_context = await search_products(
+                            user_query=user_text,
+                            quiz_json=quiz_json_obj,
+                            allowed_magazine_ids=current_magazine.id,
+                            top_k=10
+                        )
+                    elif feed_url == "PREMIUM_AGGREGATOR":
+                        products_context = await search_products(
+                            user_query=user_text,
+                            quiz_json=quiz_json_obj,
+                            allowed_magazine_ids=TOP_SHOPS_IDS,
+                            top_k=10
+                        )
+                    else:
+                        final_shop_url = current_magazine.url_website
+                else:
+                    products_context = await search_products(
+                        user_query=user_text,
+                        quiz_json=quiz_json_obj,
+                        allowed_magazine_ids=TOP_SHOPS_IDS,
+                        top_k=10
+                    )
+
+            # --- ГЕНЕРАЦИЯ (долгая операция) ---
+            mode_key = "catalog_mode" if is_catalog_mode else "info_mode"
+
+            system_prompt = get_system_prompt(
+                mode=mode_key,
+                quiz_data=quiz_data_str,
+                shop_url=final_shop_url,
+                products_context=products_context
+            )
+
+            answer = await ask_responses_api(
+                user_message=user_text,
+                system_instruction=system_prompt
+            )
+
+            # --- ФУТЕРЫ ---
+            marketing_footer = ""
+            if is_catalog_mode:
+                if first_catalog_request:
+                    marketing_footer = get_marketing_footer("catalog_mode")
+                    await update_user_flags(session, telegram_id, first_catalog_request=False)
+            else:
+                if first_info_request:
+                    marketing_footer = get_marketing_footer("info_mode")
+                    await update_user_flags(session, telegram_id, first_info_request=False)
+
+            if marketing_footer:
+                answer += marketing_footer
+
+            # --- УДАЛЯЕМ "Думаю..." ---
+            with contextlib.suppress(Exception):
+                await bot.delete_message(chat_id=chat_id, message_id=typing_msg_id)
+
+            # --- ОТПРАВКА ---
+            try:
+                await bot.send_message(chat_id, answer, parse_mode=ParseMode.HTML, disable_web_page_preview=True)
+            except TelegramBadRequest as e:
+                logger.error(f"HTML Parse Error: {e}")
+                await bot.send_message(chat_id, answer, parse_mode=None, disable_web_page_preview=True)
+
+            # --- СПИСАНИЕ УЖЕ ВЫПОЛНЕНО АТОМАРНО В ХЭНДЛЕРЕ ---
+            # update_user_requests здесь не нужен
+
+    except Exception as e:
+        logger.error(f"Error in _run_ai_message_task: {e}", exc_info=True)
+        # Возвращаем запрос — он был списан авансом, но LLM не ответил
+        await refund_request(telegram_id)
+        with contextlib.suppress(Exception):
+            await bot.delete_message(chat_id=chat_id, message_id=typing_msg_id)
+        with contextlib.suppress(Exception):
+            await bot.send_message(chat_id, "⚠️ Произошла ошибка. Запрос не списан, попробуйте ещё раз.")
+    finally:
+        stop_event.set()
+        typing_task.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await typing_task
+
+
+# ==========================================
+# 2. ОБРАБОТКА ТЕКСТА (С УЧЕТОМ РЕЖИМА)
+# ==========================================
 @for_user_router.message(F.text, AIChat.catalog_mode)
 @for_user_router.message(F.text, AIChat.info_mode)
 async def handle_ai_message(message: Message, state: FSMContext, session: AsyncSession, bot: Bot):
     # Проверки (промокод, баланс...)
-    if await closed_menu(message=message, session=session): return
+    if await closed_menu(message=message, session=session):
+        return
 
-    # Делаем "точечный" запрос в БД только за балансом
-    # Это гарантирует 100% точность, игнорируя старый кэш
-    result = await session.execute(
-        select(User.requests_left).where(User.telegram_id == message.from_user.id)
-    )
-    # Если база вернет None (маловероятно), подстрахуемся 0
-    real_balance = result.scalar_one_or_none() or 0
-
-    if real_balance <= 0:
+    # Атомарно резервируем запрос в БД.
+    # WHERE requests_left > 0 гарантирует защиту от быстрых повторных нажатий.
+    reserved = await try_reserve_request(session, message.from_user.id)
+    if not reserved:
         await message.answer(
             f"💡 Чтобы я мог выдать точный результат и завершить персональный анализ под ваши условия, выберите "
             f"пакет запросов ниже"
@@ -476,145 +844,196 @@ async def handle_ai_message(message: Message, state: FSMContext, session: AsyncS
         )
         return
 
-    # Получаем текущий режим (state)
     current_state = await state.get_state()
     is_catalog_mode = (current_state == AIChat.catalog_mode.state)
 
-    stop_event = asyncio.Event()
-    typing_task = asyncio.create_task(send_typing(bot, message.chat.id, stop_event))
+    # Получаем юзера через кэш Redis (нужны id, magazine_id, флаги)
+    user = await get_user_cached(session, message.from_user.id)
+    if not user:
+        return
+
+    # Отправляем индикацию — хэндлер на этом заканчивается, Telegram получает 200 OK
     typing_msg = await message.answer("🤔 Думаю..." if not is_catalog_mode else "🔍 Ищу варианты...")
 
-    try:
-        # Молниеносные запросы в БД через кэш Redis (что бы снять нагрузку из-за частых, однотипных обращений в БД)
-        user = await get_user_cached(session, message.from_user.id)
-        if not user: return
-        # --- СБОР ДАННЫХ ---
-        mag_result = await session.execute(select(Magazine).where(Magazine.id == user.magazine_id))
-        current_magazine = mag_result.scalar_one_or_none()
-
-        quiz_data_str = "Нет данных."
-        quiz_json_obj = {}
-        user_branch = "pregnant"  # Дефолт
-
-        quiz_result = await session.execute(
-            select(UserQuizProfile).where(UserQuizProfile.user_id == user.id).order_by(UserQuizProfile.id.desc()).limit(
-                1)
+    # Запускаем тяжёлую работу в фоне — не ждём её завершения
+    asyncio.create_task(
+        _run_ai_message_task(
+            bot=bot,
+            chat_id=message.chat.id,
+            telegram_id=message.from_user.id,
+            user_text=message.text,
+            typing_msg_id=typing_msg.message_id,
+            user_id=user.id,
+            magazine_id=user.magazine_id,
+            is_catalog_mode=is_catalog_mode,
+            first_catalog_request=user.first_catalog_request,
+            first_info_request=user.first_info_request,
         )
-        quiz_profile = quiz_result.scalar_one_or_none()
+    )
 
-        if quiz_profile:
-            if quiz_profile.branch:
-                user_branch = quiz_profile.branch
-            try:
-                if isinstance(quiz_profile.data, str):
-                    quiz_json_obj = json.loads(quiz_profile.data)
-                    quiz_data_str = quiz_profile.data
-                else:
-                    quiz_json_obj = quiz_profile.data
-                    quiz_data_str = json.dumps(quiz_profile.data, ensure_ascii=False)
-            except:
-                pass
-
-        # --- ЛОГИКА ПОИСКА (ТОЛЬКО ДЛЯ CATALOG MODE) ---
-        products_context = ""
-        final_shop_url = None
-
-        if is_catalog_mode:
-            # Тут работает ChromaDB или Site Search (ОБНОВЛЕННАЯ ЛОГИКА)
-            if current_magazine:
-                feed_url = current_magazine.feed_url
-
-                # Условие 1: Конкретный YML
-                if feed_url and "http" in feed_url:
-                    products_context = await search_products(
-                        user_query=message.text,  # Тут передаем текст пользователя
-                        quiz_json=quiz_json_obj,
-                        allowed_magazine_ids=current_magazine.id,
-                        top_k=10
-                    )
-
-                # Условие 2: Премиум агрегатор (ТОП-5)
-                elif feed_url == "PREMIUM_AGGREGATOR":
-                    products_context = await search_products(
-                        user_query=message.text,
-                        quiz_json=quiz_json_obj,
-                        allowed_magazine_ids=TOP_SHOPS_IDS,  # Поиск по списку топ магазинов
-                        top_k=10
-                    )
-
-                # Условие 3: Пусто  -> Идем на сайт
-                else:
-                    final_shop_url = current_magazine.url_website
-
-            else:
-                # Fallback: Если магазина нет вообще -> Ищем по ТОП-5
-                products_context = await search_products(
-                    user_query=message.text,
-                    quiz_json=quiz_json_obj,
-                    allowed_magazine_ids=TOP_SHOPS_IDS,
-                    top_k=10
-                )
-
-        # Если режим INFO - мы просто пропускаем блок выше, products_context остается пустым,
-        # и get_system_prompt выдаст шаблон эксперта.
-
-        # --- ГЕНЕРАЦИЯ ---
-        mode_key = "catalog_mode" if is_catalog_mode else "info_mode"
-
-        system_prompt = get_system_prompt(
-            mode=mode_key,
-            quiz_data=quiz_data_str,
-            shop_url=final_shop_url,
-            products_context=products_context
-        )
-
-        answer = await ask_responses_api(
-            user_message=message.text,
-            system_instruction=system_prompt
-        )
-
-        # --- 🔥 НОВАЯ ЛОГИКА ФУТЕРОВ (ДВА ФЛАГА) ---
-        marketing_footer = ""
-
-        if is_catalog_mode:
-            # Если режим Каталога И это первый запрос в каталог
-            if user.first_catalog_request:
-                marketing_footer = get_marketing_footer("catalog_mode")
-                await update_user_flags(session, user.telegram_id, first_catalog_request=False)  # Сжигаем флаг каталога
-        else:
-            # Если режим Инфо И это первый запрос эксперту
-            if user.first_info_request:
-                marketing_footer = get_marketing_footer("info_mode")
-                await update_user_flags(session, user.telegram_id, first_info_request=False)  # Сжигаем флаг инфо
-
-        # Добавляем футер, если он сгенерировался
-        if marketing_footer:
-            answer += marketing_footer
-
-        # --- ОТПРАВКА ---
-        try:
-            await message.answer(answer, parse_mode=ParseMode.HTML, disable_web_page_preview=True)
-        except TelegramBadRequest as e:
-            # Если даже HTML сломался (очень редко), логируем и шлем текст
-            logger.error(f"HTML Parse Error: {e}")
-            await message.answer(answer, parse_mode=None, disable_web_page_preview=True)
-
-        # 🔥 Вместо (списание запросов):
-        # Обновляем атомарно и БД, и Кэш
-        await update_user_requests(session, user.telegram_id, decrement=1)
-
-    except Exception as e:
-        logger.error(f"Error: {e}", exc_info=True)
-        await message.answer("⚠️ Произошла ошибка. Попробуйте позже.")
-    finally:
-        stop_event.set()
-        typing_task.cancel()
-        with contextlib.suppress(asyncio.CancelledError):
-            await typing_task
-        try:
-            await typing_msg.delete()
-        except:
-            pass
+# @for_user_router.message(F.text, AIChat.catalog_mode)
+# @for_user_router.message(F.text, AIChat.info_mode)
+# async def handle_ai_message(message: Message, state: FSMContext, session: AsyncSession, bot: Bot):
+#     # Проверки (промокод, баланс...)
+#     if await closed_menu(message=message, session=session): return
+#
+#     # Делаем "точечный" запрос в БД только за балансом
+#     # Это гарантирует 100% точность, игнорируя старый кэш
+#     result = await session.execute(
+#         select(User.requests_left).where(User.telegram_id == message.from_user.id)
+#     )
+#     # Если база вернет None (маловероятно), подстрахуемся 0
+#     real_balance = result.scalar_one_or_none() or 0
+#
+#     if real_balance <= 0:
+#         await message.answer(
+#             f"💡 Чтобы я мог выдать точный результат и завершить персональный анализ под ваши условия, выберите "
+#             f"пакет запросов ниже"
+#             f"\n\n<a href='https://telegra.ph/AI-konsultant-rabotaet-na-platnoj-platforme-httpsplatformopenaicom-01-16'>"
+#             "(Как это работает и что считается запросом?)</a>",
+#             reply_markup=kb.pay
+#         )
+#         return
+#
+#     # Получаем текущий режим (state)
+#     current_state = await state.get_state()
+#     is_catalog_mode = (current_state == AIChat.catalog_mode.state)
+#
+#     stop_event = asyncio.Event()
+#     typing_task = asyncio.create_task(send_typing(bot, message.chat.id, stop_event))
+#     typing_msg = await message.answer("🤔 Думаю..." if not is_catalog_mode else "🔍 Ищу варианты...")
+#
+#     try:
+#         # Молниеносные запросы в БД через кэш Redis (что бы снять нагрузку из-за частых, однотипных обращений в БД)
+#         user = await get_user_cached(session, message.from_user.id)
+#         if not user: return
+#         # --- СБОР ДАННЫХ ---
+#         mag_result = await session.execute(select(Magazine).where(Magazine.id == user.magazine_id))
+#         current_magazine = mag_result.scalar_one_or_none()
+#
+#         quiz_data_str = "Нет данных."
+#         quiz_json_obj = {}
+#         user_branch = "pregnant"  # Дефолт
+#
+#         quiz_result = await session.execute(
+#             select(UserQuizProfile).where(UserQuizProfile.user_id == user.id).order_by(UserQuizProfile.id.desc()).limit(
+#                 1)
+#         )
+#         quiz_profile = quiz_result.scalar_one_or_none()
+#
+#         if quiz_profile:
+#             if quiz_profile.branch:
+#                 user_branch = quiz_profile.branch
+#             try:
+#                 if isinstance(quiz_profile.data, str):
+#                     quiz_json_obj = json.loads(quiz_profile.data)
+#                     quiz_data_str = quiz_profile.data
+#                 else:
+#                     quiz_json_obj = quiz_profile.data
+#                     quiz_data_str = json.dumps(quiz_profile.data, ensure_ascii=False)
+#             except:
+#                 pass
+#
+#         # --- ЛОГИКА ПОИСКА (ТОЛЬКО ДЛЯ CATALOG MODE) ---
+#         products_context = ""
+#         final_shop_url = None
+#
+#         if is_catalog_mode:
+#             # Тут работает ChromaDB или Site Search (ОБНОВЛЕННАЯ ЛОГИКА)
+#             if current_magazine:
+#                 feed_url = current_magazine.feed_url
+#
+#                 # Условие 1: Конкретный YML
+#                 if feed_url and "http" in feed_url:
+#                     products_context = await search_products(
+#                         user_query=message.text,  # Тут передаем текст пользователя
+#                         quiz_json=quiz_json_obj,
+#                         allowed_magazine_ids=current_magazine.id,
+#                         top_k=10
+#                     )
+#
+#                 # Условие 2: Премиум агрегатор (ТОП-5)
+#                 elif feed_url == "PREMIUM_AGGREGATOR":
+#                     products_context = await search_products(
+#                         user_query=message.text,
+#                         quiz_json=quiz_json_obj,
+#                         allowed_magazine_ids=TOP_SHOPS_IDS,  # Поиск по списку топ магазинов
+#                         top_k=10
+#                     )
+#
+#                 # Условие 3: Пусто  -> Идем на сайт
+#                 else:
+#                     final_shop_url = current_magazine.url_website
+#
+#             else:
+#                 # Fallback: Если магазина нет вообще -> Ищем по ТОП-5
+#                 products_context = await search_products(
+#                     user_query=message.text,
+#                     quiz_json=quiz_json_obj,
+#                     allowed_magazine_ids=TOP_SHOPS_IDS,
+#                     top_k=10
+#                 )
+#
+#         # Если режим INFO - мы просто пропускаем блок выше, products_context остается пустым,
+#         # и get_system_prompt выдаст шаблон эксперта.
+#
+#         # --- ГЕНЕРАЦИЯ ---
+#         mode_key = "catalog_mode" if is_catalog_mode else "info_mode"
+#
+#         system_prompt = get_system_prompt(
+#             mode=mode_key,
+#             quiz_data=quiz_data_str,
+#             shop_url=final_shop_url,
+#             products_context=products_context
+#         )
+#
+#         answer = await ask_responses_api(
+#             user_message=message.text,
+#             system_instruction=system_prompt
+#         )
+#
+#         # --- 🔥 НОВАЯ ЛОГИКА ФУТЕРОВ (ДВА ФЛАГА) ---
+#         marketing_footer = ""
+#
+#         if is_catalog_mode:
+#             # Если режим Каталога И это первый запрос в каталог
+#             if user.first_catalog_request:
+#                 marketing_footer = get_marketing_footer("catalog_mode")
+#                 await update_user_flags(session, user.telegram_id, first_catalog_request=False)  # Сжигаем флаг каталога
+#         else:
+#             # Если режим Инфо И это первый запрос эксперту
+#             if user.first_info_request:
+#                 marketing_footer = get_marketing_footer("info_mode")
+#                 await update_user_flags(session, user.telegram_id, first_info_request=False)  # Сжигаем флаг инфо
+#
+#         # Добавляем футер, если он сгенерировался
+#         if marketing_footer:
+#             answer += marketing_footer
+#
+#         # --- ОТПРАВКА ---
+#         try:
+#             await message.answer(answer, parse_mode=ParseMode.HTML, disable_web_page_preview=True)
+#         except TelegramBadRequest as e:
+#             # Если даже HTML сломался (очень редко), логируем и шлем текст
+#             logger.error(f"HTML Parse Error: {e}")
+#             await message.answer(answer, parse_mode=None, disable_web_page_preview=True)
+#
+#         # 🔥 Вместо (списание запросов):
+#         # Обновляем атомарно и БД, и Кэш
+#         await update_user_requests(session, user.telegram_id, decrement=1)
+#
+#     except Exception as e:
+#         logger.error(f"Error: {e}", exc_info=True)
+#         await message.answer("⚠️ Произошла ошибка. Попробуйте позже.")
+#     finally:
+#         stop_event.set()
+#         typing_task.cancel()
+#         with contextlib.suppress(asyncio.CancelledError):
+#             await typing_task
+#         try:
+#             await typing_msg.delete()
+#         except:
+#             pass
 
 
 

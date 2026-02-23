@@ -45,3 +45,4 @@
     "При оплате.jpg": "AgACAgIAAyEGAATQjmD4AANnaY3ziPd3A8eUTwbZqo6-aqCuxmYAAmQaaxs1a3FI56_9NYQIxA0BAAMCAAN5AAM6BA",
     гиф завершения квиза -> CgACAgQAAxkBAAIxe2liVpUmUuaoAAEWiAq4dZsc4CTygQACBAMAAvYbHVNpZ9ehQ-1QTjgE
     "for_blog.jpg": "AgACAgIAAyEGAATQjmD4AANuaZnp85G2dqnEAAEE7tjDMTHOaparAALHGWsbAbrRSEMyKwp3hwQVAQADAgADdwADOgQ"
+

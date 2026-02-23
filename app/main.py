@@ -36,16 +36,8 @@ WEBAPP_HOST = "0.0.0.0"
 WEBAPP_PORT = 8000
 
 
-# storage = RedisStorage(redis=redis, key_builder=DefaultKeyBuilder(with_bot_id=True))
+
 bot = Bot(token=os.getenv("TOKEN"), default=DefaultBotProperties(parse_mode=ParseMode.HTML))
-# dp = Dispatcher(storage=storage)
-
-
-
-# dp.include_router(menu_cmds_router)
-# dp.include_router(quiz_router)
-# dp.include_router(for_user_router)
-
 
 
 
