@@ -131,9 +131,18 @@ async def main():
     # Делаем это через create_task, чтобы он работал параллельно
     # и не мешал веб-серверу принимать входящие запросы.
     # =================================================================
-    asyncio.create_task(run_service_notifications(bot, session_maker))
+    worker_task = asyncio.create_task(run_service_notifications(bot, session_maker))
+
     # Держим процесс живым
-    await asyncio.Event().wait()
+    try:
+        await asyncio.Event().wait()
+    finally:
+        # Штатная остановка воркера при завершении процесса
+        worker_task.cancel()
+        try:
+            await worker_task
+        except asyncio.CancelledError:
+            pass
 
 
 
