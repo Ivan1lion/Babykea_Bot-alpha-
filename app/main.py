@@ -2,6 +2,7 @@ import asyncio
 import os
 import signal
 import logging
+import sys
 
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.fsm.storage.redis import RedisStorage, DefaultKeyBuilder
@@ -28,8 +29,11 @@ from app.services.search_service import chroma_client
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(
-    level=logging.INFO, #При деплое поставить level=logging.WARNING что бы не засорять терминал лишними логами
-    format="%(asctime)s | %(levelname)s | %(name)s | %(message)s"
+    level=logging.INFO,  # При деплое поставить level=logging.WARNING
+    format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
+    handlers=[
+        logging.StreamHandler(sys.stdout)  # ← Добавить эту строку
+    ]
 )
 
 # Константы

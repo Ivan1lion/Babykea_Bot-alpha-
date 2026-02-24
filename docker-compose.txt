@@ -1,0 +1,156 @@
+version: '3.8'
+
+# ==========================================
+# 1. ОБЩИЕ ТОМА (ДЛЯ СОХРАНЕНИЯ ДАННЫХ)
+# ==========================================
+volumes:
+  postgres_data:
+  redis_data:
+  caddy_data:     # Здесь Caddy хранит полученные SSL сертификаты
+  caddy_config:
+
+# ==========================================
+# 2. ИЗОЛИРОВАННАЯ СЕТЬ
+# ==========================================
+networks:
+  bot_network:
+    driver: bridge
+
+services:
+  # === 🐘 БАЗА ДАННЫХ POSTGRESQL ===
+  db:
+    image: postgres:15-alpine
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-Babykea_Bot_alpha}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-Babykea_Bot_alpha}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - bot_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-Babykea_Bot_alpha} -d ${POSTGRES_DB:-Babykea_Bot_alpha}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # === ⚡ REDIS (КЭШ И FSM) ===
+  redis:
+    image: redis:alpine
+    restart: always
+    # Включаем пароль для Redis, если он есть в .env
+    command: redis-server --requirepass ${REDIS_PASSWORD}
+    volumes:
+      - redis_data:/data
+    networks:
+      - bot_network
+    healthcheck:
+      # Пингуем Redis с учетом пароля
+      test: ["CMD", "sh", "-c", "redis-cli -a $$REDIS_PASSWORD ping | grep PONG"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # === 🤖 ТВОЙ TELEGRAM БОТ ===
+  bot:
+    build: .
+    restart: always
+    env_file:
+      - .env
+    volumes:
+      # Пробрасываем папку с ChromaDB наружу для бекапов
+      # Предполагается, что в Dockerfile WORKDIR /app
+      - ./chromadb_storage:/app/chromadb_storage
+    networks:
+      - bot_network
+    # 🔥 Главная магия: бот ждет ПОЛНОЙ готовности баз
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # === 🔄 ВОРКЕР ОБНОВЛЕНИЯ ВЕКТОРОВ (10 ДНЕЙ) ===
+  vector_updater:
+    build: . # Собирается из того же Dockerfile, что и бот
+    restart: always
+    env_file:
+      - .env
+    volumes:
+      # Разделяет ту же самую папку БД с ботом!
+      - ./chromadb_storage:/app/chromadb_storage
+    networks:
+      - bot_network
+    depends_on:
+      db:
+        condition: service_healthy
+    # Запускаем бесконечный цикл: скрипт -> сон 10 дней (864000 секунд) -> повтор
+    # Замени "app/scripts/update_vectors.py" на свой реальный путь к файлу
+    command: >
+      /bin/sh -c "
+      while true; do
+        echo '🚀 Запуск обновления ChromaDB...';
+        python update_vectors.py;
+        echo '💤 Обновление завершено. Сплю 10 дней...';
+        sleep 864000;
+      done
+      "
+
+  # === 📊 METABASE (АНАЛИТИКА) ===
+  metabase:
+    image: metabase/metabase:latest
+    restart: always
+    environment:
+      MB_DB_TYPE: postgres
+      MB_DB_DBNAME: ${POSTGRES_DB:-Babykea_Bot_alpha}
+      MB_DB_PORT: 5432
+      MB_DB_USER: ${POSTGRES_USER:-Babykea_Bot_alpha}
+      MB_DB_PASS: ${POSTGRES_PASSWORD}
+      MB_DB_HOST: db
+    networks:
+      - bot_network
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      # 🛡 БЕЗОПАСНОСТЬ: Доступ только внутри сервера (SSH туннель)
+      - "127.0.0.1:3000:3000"
+
+  # === 🌐 CADDY (HTTPS REVERSE PROXY) ===
+  caddy:
+    image: caddy:alpine
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443" # Порт для Webhook Telegram
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      - bot_network
+    depends_on:
+      - bot
+
+
+💡 3 важных момента перед запуском:
+Путь к update_vectors.py:
+В блоке vector_updater я написал python update_vectors.py. Если твой файл лежит в папке app/services/ (или где-то еще),
+обязательно исправь путь в строке command, например: python app/services/update_vectors.py.
+
+Папка chromadb_storage:
+Обрати внимание на строку - ./chromadb_storage:/app/chromadb_storage. Мы вынесли папку ChromaDB в локальную
+директорию сервера (рядом с твоим docker-compose.yml). Это решает проблему Клода с бэкапами! Тебе достаточно скопировать
+папку chromadb_storage по FTP, и база в безопасности.
+
+Caddyfile:
+Положи в эту же папку (где docker-compose.yml) текстовый файл с названием Caddyfile. Если твой домен
+bot.mastermanifest.ru, в файле должны быть всего 3 строки:
+
+bot.mastermanifest.ru {
+    reverse_proxy bot:8000
+}
+
+Теперь твой проект защищен со всех сторон. Бэкапы можно делать простым копированием папки, Webhook защищен SSL,
+Metabase не торчит в интернет, а векторы колясок будут обновляться на полном автопилоте каждые 10 суток.
