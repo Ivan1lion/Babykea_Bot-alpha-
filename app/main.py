@@ -110,7 +110,7 @@ async def on_shutdown(dispatcher: Dispatcher):
 
     # 4. Закрываем Redis
     try:
-        await redis._client.close()
+        await redis._client.aclose()
     except Exception as e:
         logger.warning(f"⚠️ Ошибка при закрытии Redis: {e}")
 

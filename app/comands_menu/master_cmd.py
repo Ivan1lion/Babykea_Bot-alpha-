@@ -8,9 +8,12 @@ from aiogram.types import (
     InlineKeyboardMarkup, InlineKeyboardButton,
     InputMediaPhoto,
 )
-from aiogram.filters import Command, StateFilter
+from aiogram.filters import Command, StateFilter, or_f
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.db.crud import closed_menu
 
 logger = logging.getLogger(__name__)
 
@@ -40,12 +43,12 @@ start_kb = InlineKeyboardMarkup(inline_keyboard=[
 ])
 
 type_kb = InlineKeyboardMarkup(inline_keyboard=[
-    [InlineKeyboardButton(text="🖼 Загрузить фото/видео", callback_data="mf_with_media")],
-    [InlineKeyboardButton(text="💬 Обращение без фото/видео", callback_data="mf_no_media")],
+    [InlineKeyboardButton(text="📸 Пришлю с фото/видео", callback_data="mf_with_media")],
+    [InlineKeyboardButton(text="💬 Просто напишу текст", callback_data="mf_no_media")],
 ])
 
 no_text_kb = InlineKeyboardMarkup(inline_keyboard=[
-    [InlineKeyboardButton(text="📨 Отправить без текста", callback_data="mf_no_text")],
+    [InlineKeyboardButton(text="➡️ Отправить без текста", callback_data="mf_no_text")],
 ])
 
 
@@ -116,8 +119,10 @@ async def _send_to_channel(bot: Bot, user, photo_ids: list, video_id: str | None
 # ==========================================
 # 0. КОМАНДА /master26
 # ==========================================
-@master_router.message(Command("master26"))
-async def master_cmd(message: Message, state: FSMContext):
+@master_router.message(or_f(Command("master26"), F.text.lower() == "master26"))
+async def master_cmd(message: Message, state: FSMContext, session: AsyncSession):
+    if await closed_menu(message=message, session=session):
+        return
     # Сбрасываем предыдущее состояние если юзер повторно нажал команду
     await state.clear()
     await state.set_state(MasterFeedbackState.choosing_type)
@@ -128,7 +133,7 @@ async def master_cmd(message: Message, state: FSMContext):
              "Родственники отдают старую коляску, и нужен честный взгляд со стороны? Вас обманули в магазине и вы хотите "
              "придать это огласке? А может, просто желаете похвастаться удачной покупкой?\n\n"
              "Пишите, кидайте фото или видео. Лучшие темы я беру для разборов и голосований в канале!\n\n"
-             "Нажмите <b>«Создать обращение»</b> чтобы начать:",
+             "Нажмите <b>«💬 Поделиться историей»</b> чтобы начать:",
         reply_markup=start_kb
     )
     await state.update_data(prompt_msg_id=prompt.message_id)
@@ -149,7 +154,9 @@ async def master_cancel(call: CallbackQuery, state: FSMContext):
     await state.clear()
     with contextlib.suppress(Exception):
         await call.message.delete()
-    await call.message.answer("Форма обратной связи закрыта.")
+    await call.message.answer("👌 <b>Без проблем, отменил</b>"
+                              "\n\nГлавное меню снова активно. Если появится интересная история, сложный выбор или "
+                              "тема для разбора в канале — вы знаете, какую команду ввести 😉")
     await call.answer()
 
 
@@ -165,8 +172,8 @@ async def master_start(call: CallbackQuery, state: FSMContext, bot: Bot):
         await call.message.delete()
 
     prompt = await call.message.answer(
-        text="Вы можете прислать <b>до 5 фото или одно видео</b> вместе с текстом обращения.\n\n"
-             "Как хотите продолжить?",
+        text="👀 <b>Жду вашу историю!</b>\n\n"
+             "К тексту можно прикрепить <b>до 5 фото или 1 видео</b>. Выбирайте, как будем отправлять:",
         reply_markup=type_kb
     )
     await state.update_data(prompt_msg_id=prompt.message_id)
@@ -184,7 +191,9 @@ async def master_no_media(call: CallbackQuery, state: FSMContext):
         await call.message.delete()
 
     prompt = await call.message.answer(
-        text="✏️ Введите и отправьте текст вашего обращения:",
+        text="<b>Договорились, только текст</b>"
+             "\n\nОпишите ситуацию во всех подробностях: что случилось, в чем сомнения или чем хотите поделиться. "
+             "Напишите всё одним сообщением и отправляйте 👇",
     )
     await state.update_data(prompt_msg_id=prompt.message_id, photo_ids=[], video_id=None)
     await call.answer()
@@ -201,7 +210,7 @@ async def master_with_media(call: CallbackQuery, state: FSMContext):
         await call.message.delete()
 
     prompt = await call.message.answer(
-        text=f"🖼 Пришлите фото (до {MAX_PHOTOS} штук) или одно видео.\n\n"
+        text=f"🖼 <b>Пришлите фото (до {MAX_PHOTOS} штук) или одно видео</b>\n\n"
              f"<i>Фото можно отправить одним альбомом или по одному.</i>",
     )
     await state.update_data(prompt_msg_id=prompt.message_id, photo_ids=[], video_id=None)
@@ -222,8 +231,8 @@ async def handle_photo(message: Message, bot: Bot, state: FSMContext):
     if len(photo_ids) >= MAX_PHOTOS:
         await message.delete()
         await message.answer(
-            f"⚠️ Максимум {MAX_PHOTOS} фото. У вас уже загружено {len(photo_ids)}.\n"
-            f"Нажмите «Отправить без текста» или введите текст обращения.",
+            f"📸 Места для фото больше нет (максимум {MAX_PHOTOS})"
+            f"\n\nТеперь опишите ситуацию одним сообщением и отправьте его мне или нажмите кнопку ниже",
             reply_markup=no_text_kb
         )
         return
@@ -240,7 +249,8 @@ async def handle_photo(message: Message, bot: Bot, state: FSMContext):
         await state.set_state(MasterFeedbackState.waiting_text)
         prompt = await message.answer(
             f"✅ {MAX_PHOTOS} фото получено!\n\n"
-            f"✏️ Теперь введите текст обращения или нажмите «Отправить без текста»:",
+            f"Теперь расскажите, в чем суть: что сломалось, между чем выбираем или чем хвастаемся?"
+            f"\n\nНапишите всё в одном сообщении и отправьте его мне или нажмите кнопку ниже",
             reply_markup=no_text_kb
         )
         await state.update_data(prompt_msg_id=prompt.message_id)
@@ -253,9 +263,9 @@ async def handle_photo(message: Message, bot: Bot, state: FSMContext):
                 chat_id=message.chat.id,
                 message_id=data.get("prompt_msg_id"),
                 text=f"🖼 Получено фото: {len(photo_ids)}/{MAX_PHOTOS}.\n\n"
-                     f"Можно добавить ещё {remaining} или нажмите кнопку ниже:",
+                     f"Можете докинуть ещё {remaining} или нажмите кнопку ниже",
                 reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-                    [InlineKeyboardButton(text="➡️ Перейти к тексту", callback_data="mf_media_done")]
+                    [InlineKeyboardButton(text="✍️ Добавить текст", callback_data="mf_media_done")]
                 ])
             )
 
@@ -270,7 +280,8 @@ async def handle_video(message: Message, bot: Bot, state: FSMContext):
     # Если уже есть фото — не разрешаем смешивать
     if data.get("photo_ids"):
         await message.delete()
-        await message.answer("⚠️ Вы уже добавили фото. Нельзя смешивать фото и видео.\nПродолжайте добавлять фото или перейдите к тексту.")
+        await message.answer("⚠️ Вы уже добавили фото. Нельзя смешивать фото и видео"
+                             "\n\nПродолжайте добавлять фото или перейдите к тексту")
         return
 
     await message.delete()
@@ -279,8 +290,9 @@ async def handle_video(message: Message, bot: Bot, state: FSMContext):
     await state.set_state(MasterFeedbackState.waiting_text)
 
     prompt = await message.answer(
-        "✅ Видео получено!\n\n"
-        "✏️ Введите текст обращения или нажмите «Отправить без текста»:",
+        "✅ <b>Видео получено!</b>\n\n"
+        "Добавьте пару слов для контекста: суть проблемы или ваш вопрос"
+        "\n\nНапишите всё в одном сообщении и отправьте его мне или нажмите кнопку ниже",
         reply_markup=no_text_kb
     )
     await state.update_data(prompt_msg_id=prompt.message_id)
@@ -297,7 +309,8 @@ async def master_media_done(call: CallbackQuery, state: FSMContext):
         await call.message.delete()
 
     prompt = await call.message.answer(
-        "✏️ Введите текст вашего обращения или нажмите «Отправить без текста»:",
+        "Добавьте пару слов для контекста: суть проблемы или ваш вопрос"
+        "\n\nНапишите всё в одном сообщении и отправьте его мне или нажмите кнопку ниже",
         reply_markup=no_text_kb
     )
     await state.update_data(prompt_msg_id=prompt.message_id)
@@ -317,7 +330,7 @@ async def handle_wrong_media(message: Message):
     await message.delete()
     await message.answer(
         f"⚠️ Допускается только фото (до {MAX_PHOTOS} штук) или одно видео.\n\n"
-        f"Повторите отправку."
+        f"Повторите отправку"
     )
 
 
@@ -341,8 +354,9 @@ async def master_no_text(call: CallbackQuery, state: FSMContext, bot: Bot):
 
     await state.clear()
     await call.message.answer(
-        "✅ <b>Обращение отправлено!</b>\n\n"
-        "Мастер ответит вам в ближайшее время."
+        "✅ <b>Послание отправлено!</b>\n\n"
+        "Если это тот самый случай, на котором стоит поучиться остальным, или просто классная история — скоро обсудим "
+        "её в канале! Спасибо 👍"
     )
     await call.answer()
 
@@ -367,8 +381,9 @@ async def handle_text(message: Message, bot: Bot, state: FSMContext):
 
     await state.clear()
     await message.answer(
-        "✅ <b>Обращение отправлено!</b>\n\n"
-        "Мастер ответит вам в ближайшее время."
+        "✅ <b>Послание отправлено!</b>\n\n"
+        "Если это тот самый случай, на котором стоит поучиться остальным, или просто классная история — скоро обсудим "
+        "её в канале! Спасибо 👍"
     )
 
 
@@ -378,4 +393,4 @@ async def handle_text(message: Message, bot: Bot, state: FSMContext):
 @master_router.message(StateFilter(MasterFeedbackState.waiting_text), ~F.text)
 async def handle_wrong_text(message: Message):
     await message.delete()
-    await message.answer("⚠️ Пожалуйста, отправьте текстовое сообщение.")
+    await message.answer("⚠️ Пожалуйста, отправьте текстовое сообщение")
