@@ -1,3 +1,4 @@
+import uuid
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 from sqlalchemy.ext.asyncio import AsyncAttrs
 from sqlalchemy.sql import func
@@ -46,11 +47,17 @@ class User(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     promo_code: Mapped[str] = mapped_column(String(150), nullable=True)
 
-    telegram_id: Mapped[int] = mapped_column(
+    telegram_id: Mapped[int | None] = mapped_column(
         BigInteger,
         unique=True,
         index=True,
-        nullable=False
+        nullable=True  # Теперь nullable — юзер может быть только из VK
+    )
+    vk_id: Mapped[int | None] = mapped_column(
+        BigInteger,
+        unique=True,
+        index=True,
+        nullable=True  # Юзер может быть только из Telegram
     )
     username: Mapped[str] = mapped_column(String(150), nullable=True)
 
@@ -171,6 +178,12 @@ class Payment(Base):
 
     telegram_id: Mapped[int] = mapped_column(BigInteger, index=True)
 
+    platform: Mapped[str] = mapped_column(
+        String(10),
+        default="telegram",
+        server_default="telegram"
+    )  # "telegram" | "vk"
+
     amount: Mapped[Decimal] = mapped_column(Numeric(10, 2))
 
     status: Mapped[str] = mapped_column(String(20))  # pending | succeeded | canceled | failed
@@ -180,4 +193,41 @@ class Payment(Base):
     # canceled → отменённая
 
     receipt_url: Mapped[str | None] = mapped_column(String, nullable=True)
+
+
+
+#8 Платёжная сессия (связывает юзера в боте с оплатой на лендинге)
+class PaymentSession(Base):
+    __tablename__ = "payment_sessions"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+
+    # Уникальный токен для URL лендинга: /checkout/{token}
+    token: Mapped[str] = mapped_column(
+        String(64),
+        unique=True,
+        index=True,
+        nullable=False,
+        default=lambda: uuid.uuid4().hex
+    )
+
+    # Кто платит
+    telegram_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    vk_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+
+    platform: Mapped[str] = mapped_column(String(10), nullable=False)  # "telegram" | "vk"
+
+    # Что и сколько
+    payment_type: Mapped[str] = mapped_column(String(50), nullable=False)  # "pay29", "pay190", "pay950", "pay_access"
+    amount: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False)
+
+    # Статус сессии
+    status: Mapped[str] = mapped_column(
+        String(20),
+        default="pending",
+        server_default="pending"
+    )  # pending → redirected → paid → expired
+
+    # ID платежа ЮKassa (заполняется когда юзер нажал "Оплатить" на лендинге)
+    yookassa_payment_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
 
