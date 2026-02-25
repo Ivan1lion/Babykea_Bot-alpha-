@@ -46,3 +46,4 @@
     гиф завершения квиза -> CgACAgQAAxkBAAIxe2liVpUmUuaoAAEWiAq4dZsc4CTygQACBAMAAvYbHVNpZ9ehQ-1QTjgE
     "for_blog.jpg": "AgACAgIAAyEGAATQjmD4AANuaZnp85G2dqnEAAEE7tjDMTHOaparAALHGWsbAbrRSEMyKwp3hwQVAQADAgADdwADOgQ"
 
+
