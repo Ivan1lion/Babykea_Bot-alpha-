@@ -173,7 +173,7 @@ async def master_start(call: CallbackQuery, state: FSMContext, bot: Bot):
 
     prompt = await call.message.answer(
         text="👀 <b>Жду вашу историю!</b>\n\n"
-             "К тексту можно прикрепить <b>до 5 фото или 1 видео</b>. Выбирайте, как будем отправлять:",
+             "К тексту можно прикрепить <b>до 5 фото или 1 видео</b>. Выбирайте, как будем отправлять",
         reply_markup=type_kb
     )
     await state.update_data(prompt_msg_id=prompt.message_id)
