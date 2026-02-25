@@ -147,3 +147,29 @@ async def activate_premium_subscription(session: AsyncSession, telegram_id: int,
             first_catalog_request=False    # 🔥 Снимаем флаг для первого ответа по поиску (что бы не было промо в ответе)
         )
     )
+
+
+
+# ============================================================
+# VK: Создание/получение пользователя по vk_id
+# ============================================================
+
+async def get_or_create_user_vk(session: AsyncSession, vk_id: int) -> User:
+    """Аналог get_or_create_user, но для VK."""
+    result = await session.execute(select(User).where(User.vk_id == vk_id))
+    user = result.scalar_one_or_none()
+    if user:
+        user.is_active = True
+        await session.commit()
+        await session.refresh(user)
+        return user
+
+    new_user = User(
+        vk_id=vk_id,
+        requests_left=1,
+        is_active=True,
+    )
+    session.add(new_user)
+    await session.commit()
+    await session.refresh(new_user)
+    return new_user
