@@ -1,51 +1,66 @@
 version: '3.8'
 
 services:
-##   1. Твой Бот
-#  bot:
-#    build: .
-#    container_name: babykea_bot
-#    restart: always
-#    ports:
-#      - "8000:8000"
-#    # Команда запуска: сперва накатываем миграции, потом запускаем бота
-#    command: sh -c "alembic upgrade head && python -m app.main"
-#    env_file:
-#      - .env
-#    environment:
-#      # Внутри докера хосты называются именами сервисов
-#      - DB_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
-#      - REDIS_HOST=redis
-#      - REDIS_PORT=6379
-#    volumes:
-#      # Пробрасываем медиа, чтобы бот мог сохранять/читать файлы
-#      - ./app/mediafile_for_bot:/app/app/mediafile_for_bot
-#      # Пробрасываем ChromaDB (векторное хранилище), чтобы не потерять базу при рестарте
-#      - ./app/chromadb_storage:/app/app/chromadb_storage
-#    depends_on:
-#      - db
-#      - redis
-#    networks:
-#      - bot_net
-#
-#  # 2. База данных PostgreSQL
-#  db:
-#    image: postgres:15-alpine
-#    container_name: babykea_postgres
-#    restart: always
-#    environment:
-#      POSTGRES_USER: ${POSTGRES_USER}
-#      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-#      POSTGRES_DB: ${POSTGRES_DB}
-#    volumes:
-#      - postgres_data:/var/lib/postgresql/data
-#    ports:
-#      - "5432:5432" # Оставляем порт открытым, чтобы ты мог подключиться к БД через DBeaver/PgAdmin
-#    networks:
-#      - bot_net
+  # 1. Telegram-бот + веб-сервер (webhook + лендинг)
+  bot_telegram:
+    build: .
+    container_name: babykea_telegram
+    restart: always
+    ports:
+      - "8000:8000"
+    command: python run_telegram.py
+    env_file:
+      - .env
+    environment:
+      - DB_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    volumes:
+      - ./app/mediafile_for_bot:/app/app/mediafile_for_bot
+      - ./chromadb_storage:/app/chromadb_storage
+    depends_on:
+      - db
+      - redis
+    networks:
+      - bot_net
 
+  # 2. VK-бот (будет активирован позже)
+  # bot_vk:
+  #   build: .
+  #   container_name: babykea_vk
+  #   restart: always
+  #   command: python run_vk.py
+  #   env_file:
+  #     - .env
+  #   environment:
+  #     - DB_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+  #     - REDIS_HOST=redis
+  #     - REDIS_PORT=6379
+  #   volumes:
+  #     - ./chromadb_storage:/app/chromadb_storage
+  #   depends_on:
+  #     - db
+  #     - redis
+  #   networks:
+  #     - bot_net
 
-# 3. Redis (Кэш и FSM)
+  # 3. База данных PostgreSQL
+  db:
+    image: postgres:15-alpine
+    container_name: babykea_postgres
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - bot_net
+
+  # 4. Redis (Кэш и FSM)
   redis:
     image: redis:7.2-alpine
     container_name: babykea_redis
@@ -62,15 +77,15 @@ services:
     networks:
       - bot_net
 
-  # 4. Metabase (Аналитика)
+  # 5. Metabase (Аналитика)
   metabase:
     image: metabase/metabase:latest
     container_name: babykea_metabase
     restart: always
     ports:
-      - "3000:3000" # Открываем порт для браузера
+      - "3000:3000"
     extra_hosts:
-      - "host.docker.internal:host-gateway" # 🔥 МАГИЯ: Позволяет Metabase видеть твой комп
+      - "host.docker.internal:host-gateway"
     volumes:
       - metabase_data:/metabase-data
     environment:
@@ -81,11 +96,8 @@ services:
 volumes:
   postgres_data:
   redis_data:
-  metabase_data: # <--- Не забудь добавить это хранилище!
+  metabase_data:
 
 networks:
   bot_net:
     driver: bridge
-
-
-
