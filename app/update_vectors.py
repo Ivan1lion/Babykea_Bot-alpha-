@@ -1,4 +1,4 @@
-import asyncio
+﻿import asyncio
 import os
 import logging
 import xml.etree.ElementTree as ET
@@ -31,7 +31,7 @@ if "sqlite" in DATABASE_URL and "aiosqlite" not in DATABASE_URL:
 import sys
 
 sys.path.append(str(BASE_DIR))
-from app.db.models import Magazine
+from app.core.db.models import Magazine
 
 # === НАСТРОЙКИ ===
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")

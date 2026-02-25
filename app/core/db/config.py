@@ -1,7 +1,7 @@
-import os
+﻿import os
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 
-from app.db.models import Base
+from app.core.db.models import Base
 
 
 # Создаём движок и фабрику сессий

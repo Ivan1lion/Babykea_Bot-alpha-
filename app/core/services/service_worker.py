@@ -1,4 +1,4 @@
-import os
+﻿import os
 import asyncio
 from datetime import datetime, timezone, timedelta
 from sqlalchemy import select, update
@@ -7,7 +7,7 @@ from aiogram.exceptions import TelegramForbiddenError, TelegramBadRequest
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 import logging
 
-from app.db.models import User
+from app.core.db.models import User
 
 logger = logging.getLogger(__name__)
 

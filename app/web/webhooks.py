@@ -1,11 +1,11 @@
-import logging
+﻿import logging
 import os
 from aiohttp import web
 from decimal import Decimal
 
-from app.payments.security_webhook_YooKassa import is_yookassa_ip, get_peer_ip
-from app.db.config import session_maker
-from app.db.crud import (
+from app.web.security_webhook import is_yookassa_ip, get_peer_ip
+from app.core.db.config import session_maker
+from app.core.db.crud import (
     get_payment_by_payment_id,
     mark_payment_succeeded,
     mark_payment_canceled,
@@ -14,7 +14,7 @@ from app.db.crud import (
     increment_requests,
     activate_premium_subscription,
 )
-from app.payments.yookassa_client import fetch_payment
+from app.core.services.yookassa_client import fetch_payment
 
 logger = logging.getLogger(__name__)
 

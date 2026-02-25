@@ -1,4 +1,4 @@
-import os
+﻿import os
 
 from aiogram import Router, Bot, F
 from aiogram.types import Message, BotCommand, LinkPreviewOptions, InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
@@ -6,8 +6,8 @@ from aiogram.filters import Command
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.crud import closed_menu
-from app.db.models import User
+from app.core.db.crud import closed_menu
+from app.core.db.models import User
 
 
 standard_router = Router()

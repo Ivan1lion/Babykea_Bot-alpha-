@@ -1,4 +1,4 @@
-import asyncio
+﻿import asyncio
 import os
 import signal
 import logging
@@ -15,17 +15,17 @@ from aiohttp import web
 from dotenv import find_dotenv, load_dotenv
 load_dotenv(find_dotenv())
 
-from app.db.config import session_maker, engine
-from app.middlewares.db_session import DataBaseSession
-from app.middlewares.old_updates import DropOldUpdatesMiddleware
-from app.handlers.for_user import for_user_router
-from app.handlers.for_quiz import quiz_router
-from app.comands_menu.standard_cmds import bot_menu
-from app.comands_menu import menu_cmds_router
-from app.payments.payment_routes import yookassa_webhook_handler
-from app.redis_client import redis_client as redis
-from app.services.service_worker import run_service_notifications
-from app.services.search_service import chroma_client
+from app.core.db.config import session_maker, engine
+from app.platforms.telegram.middlewares.db_session import DataBaseSession
+from app.platforms.telegram.middlewares.old_updates import DropOldUpdatesMiddleware
+from app.platforms.telegram.handlers.user_handlers import for_user_router
+from app.platforms.telegram.handlers.quiz_handlers import quiz_router
+from app.platforms.telegram.handlers.standard_cmds import bot_menu
+from app.platforms.telegram.handlers import menu_cmds_router
+from app.web.webhooks import yookassa_webhook_handler
+from app.core.redis_client import redis_client as redis
+from app.core.services.service_worker import run_service_notifications
+from app.core.services.search_service import chroma_client
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(

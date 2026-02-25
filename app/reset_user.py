@@ -1,10 +1,10 @@
-import asyncio
+﻿import asyncio
 from dotenv import load_dotenv
 
 load_dotenv()
 
 # Импортируем твой клиент
-from app.redis_client import redis_client
+from app.core.redis_client import redis_client
 
 # ID пользователя, которого надо обнулить
 TARGET_USER_ID = 1887035653

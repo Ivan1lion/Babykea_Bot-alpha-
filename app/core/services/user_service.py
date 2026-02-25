@@ -1,10 +1,10 @@
-import json
+﻿import json
 import logging
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.db.models import User
-from app.schemas import UserCache
-from app.redis_client import redis_client
+from app.core.db.models import User
+from app.core.schemas import UserCache
+from app.core.redis_client import redis_client
 
 
 logger = logging.getLogger(__name__)
@@ -98,7 +98,7 @@ async def refund_request(telegram_id: int):
     Использует собственную сессию — вызывается из except-блока фоновой задачи,
     где оригинальная сессия уже могла быть закрыта или в невалидном состоянии.
     """
-    from app.db.config import session_maker  # Локальный импорт во избежание циклов
+    from app.core.db.config import session_maker  # Локальный импорт во избежание циклов
     try:
         async with session_maker() as session:
             stmt = (

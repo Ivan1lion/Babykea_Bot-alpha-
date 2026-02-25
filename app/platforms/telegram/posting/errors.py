@@ -1,6 +1,6 @@
-from sqlalchemy import update
-from app.db.config import session_maker
-from app.db.models import User
+﻿from sqlalchemy import update
+from app.core.db.config import session_maker
+from app.core.db.models import User
 
 
 async def deactivate_user(telegram_id: int) -> None:

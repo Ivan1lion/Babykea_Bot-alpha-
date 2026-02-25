@@ -1,4 +1,4 @@
-import asyncio
+﻿import asyncio
 from logging.config import fileConfig
 import os
 import sys
@@ -14,7 +14,7 @@ from alembic import context
 # --- НАСТРОЙКА ПУТЕЙ И ИМПОРТ МОДЕЛЕЙ ---
 # Добавляем корневую папку в пути, чтобы видеть app
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
-from app.db.models import Base
+from app.core.db.models import Base
 
 # ------------------------------------------
 

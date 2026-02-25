@@ -1,6 +1,6 @@
-import logging
+﻿import logging
 from aiogram.types import Message
-from app.redis_client import redis_client
+from app.core.redis_client import redis_client
 
 logger = logging.getLogger(__name__)
 

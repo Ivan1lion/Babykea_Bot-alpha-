@@ -1,10 +1,10 @@
-from aiogram import Bot
+﻿from aiogram import Bot
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.exceptions import TelegramBadRequest
 
-from app.quiz.config_quiz import QUIZ_CONFIG
-from app.db.models import UserQuizProfile
-import app.handlers.keyboards as kb
+from app.core.quiz.config_quiz import QUIZ_CONFIG
+from app.core.db.models import UserQuizProfile
+import app.platforms.telegram.keyboards as kb
 
 
 

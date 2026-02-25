@@ -1,13 +1,13 @@
-from aiogram import Router, F, Bot
+﻿from aiogram import Router, F, Bot
 from aiogram.types import CallbackQuery, Message
 from aiogram.filters import Command
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.models import User
-from app.db.crud import get_or_create_user
-from app.handlers.keyboards import kb_activation
-from app.quiz.renderer import render_quiz_step, resolve_media, build_keyboard
-from app.quiz.quiz_state_service import (
+from app.core.db.models import User
+from app.core.db.crud import get_or_create_user
+from app.platforms.telegram.keyboards import kb_activation
+from app.core.quiz.renderer import render_quiz_step, resolve_media, build_keyboard
+from app.core.quiz.quiz_state_service import (
     get_or_create_quiz_profile,
     get_current_step,
     validate_next,

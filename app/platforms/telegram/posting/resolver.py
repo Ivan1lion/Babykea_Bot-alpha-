@@ -1,9 +1,9 @@
-from aiogram.types import Message
+﻿from aiogram.types import Message
 from sqlalchemy import select
 
-from app.db.config import session_maker
-from app.db.models import MagazineChannel, MyChannel, TechChannel
-from app.posting.dto import PostingContext
+from app.core.db.config import session_maker
+from app.core.db.models import MagazineChannel, MyChannel, TechChannel
+from app.platforms.telegram.posting.dto import PostingContext
 
 
 async def resolve_channel_context(message: Message) -> PostingContext | None:

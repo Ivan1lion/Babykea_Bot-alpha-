@@ -1,4 +1,4 @@
-import os
+﻿import os
 import asyncio
 import logging
 from aiogram import Router, Bot
@@ -9,11 +9,11 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 
-from app.db.models import User
-from app.db.crud import closed_menu
-import app.handlers.keyboards as kb
-from app.redis_client import redis_client
-from app.services.user_service import get_user_cached, update_user_flags
+from app.core.db.models import User
+from app.core.db.crud import closed_menu
+import app.platforms.telegram.keyboards as kb
+from app.core.redis_client import redis_client
+from app.core.services.user_service import get_user_cached, update_user_flags
 
 
 ai_router = Router()

@@ -1,4 +1,4 @@
-import os
+﻿import os
 import asyncio
 # from decimal import Decimal
 # from aiogram import Bot
@@ -7,8 +7,8 @@ from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 # from openai import AsyncOpenAI
 
-from app.db.models import User, Payment
-from app.services.user_service import get_user_cached
+from app.core.db.models import User, Payment
+from app.core.services.user_service import get_user_cached
 
 # # Инициализируем OpenAI клиента один раз
 # client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))

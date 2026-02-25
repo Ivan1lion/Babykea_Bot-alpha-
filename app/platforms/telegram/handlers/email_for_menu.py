@@ -1,6 +1,6 @@
-from sqlalchemy import update
+﻿from sqlalchemy import update
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.db.models import User
+from app.core.db.models import User
 
 async def update_user_email(session: AsyncSession, telegram_id: int, email: str):
     """Обновляет email пользователя."""

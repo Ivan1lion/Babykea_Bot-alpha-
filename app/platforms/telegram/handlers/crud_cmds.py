@@ -1,4 +1,4 @@
-import re
+﻿import re
 import urllib.parse
 from aiogram import Router, F
 from aiogram.filters import Command, StateFilter
@@ -7,11 +7,11 @@ from aiogram.fsm.context import FSMContext
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.models import User, Magazine
-import app.handlers.keyboards as kb
-from app.comands_menu.states import MenuStates
-from app.comands_menu.email_for_menu import update_user_email
-from app.db.crud import closed_menu
+from app.core.db.models import User, Magazine
+import app.platforms.telegram.keyboards as kb
+from app.platforms.telegram.handlers.states import MenuStates
+from app.platforms.telegram.handlers.email_for_menu import update_user_email
+from app.core.db.crud import closed_menu
 
 
 # Простая регулярка для email

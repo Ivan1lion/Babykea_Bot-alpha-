@@ -1,4 +1,4 @@
-import logging
+﻿import logging
 import contextlib
 import json
 
@@ -13,7 +13,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.crud import closed_menu
+from app.core.db.crud import closed_menu
 
 logger = logging.getLogger(__name__)
 

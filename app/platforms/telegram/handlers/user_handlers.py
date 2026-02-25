@@ -1,4 +1,4 @@
-import os
+﻿import os
 import asyncio
 import random
 import string
@@ -22,20 +22,20 @@ from sqlalchemy import select
 from decimal import Decimal
 
 
-import app.handlers.keyboards as kb
-from app.handlers.keyboards import payment_button_keyboard
-from app.db.crud import get_or_create_user, closed_menu, create_pending_payment
-from app.db.models import User, Magazine, Payment, UserQuizProfile
-from app.db.config import session_maker
-from app.posting.resolver import resolve_channel_context
-from app.posting.state import is_new_post
-from app.posting.dispatcher import dispatch_post
-from app.openai_assistant.responses_client import ask_responses_api
-from app.openai_assistant.prompts_config import get_system_prompt, get_marketing_footer
-from app.payments.pay_config import PAYMENTS
-from app.services.search_service import search_products
-from app.services.user_service import get_user_cached, update_user_requests, update_user_flags, try_reserve_request, refund_request
-from app.redis_client import redis_client
+import app.platforms.telegram.keyboards as kb
+from app.platforms.telegram.keyboards import payment_button_keyboard
+from app.core.db.crud import get_or_create_user, closed_menu, create_pending_payment
+from app.core.db.models import User, Magazine, Payment, UserQuizProfile
+from app.core.db.config import session_maker
+from app.platforms.telegram.posting.resolver import resolve_channel_context
+from app.platforms.telegram.posting.state import is_new_post
+from app.platforms.telegram.posting.dispatcher import dispatch_post
+from app.core.openai_assistant.responses_client import ask_responses_api
+from app.core.openai_assistant.prompts_config import get_system_prompt, get_marketing_footer
+from app.core.services.pay_config import PAYMENTS
+from app.core.services.search_service import search_products
+from app.core.services.user_service import get_user_cached, update_user_requests, update_user_flags, try_reserve_request, refund_request
+from app.core.redis_client import redis_client
 
 
 

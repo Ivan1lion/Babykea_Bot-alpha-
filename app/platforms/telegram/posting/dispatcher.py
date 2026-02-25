@@ -1,13 +1,13 @@
-import asyncio
+﻿import asyncio
 from sqlalchemy import select
 from aiogram.types import Message
 from aiogram import Bot
 
-from app.db.config import session_maker
-from app.db.models import User
-from app.posting.dto import PostingContext
-from app.posting.queue import start_broadcast
-from app.posting.media_cache import cache_media_from_post
+from app.core.db.config import session_maker
+from app.core.db.models import User
+from app.platforms.telegram.posting.dto import PostingContext
+from app.platforms.telegram.posting.queue import start_broadcast
+from app.platforms.telegram.posting.media_cache import cache_media_from_post
 
 
 async def dispatch_post(context: PostingContext, message: Message, bot: Bot) -> None:

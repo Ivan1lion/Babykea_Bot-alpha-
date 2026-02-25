@@ -1,11 +1,11 @@
-import logging
+﻿import logging
 from datetime import datetime, timedelta, timezone
 from sqlalchemy import select, update
 # from sqlalchemy.dialects.postgresql import insert
 
-from app.db.config import session_maker
-from app.db.models import MagazineChannel, MyChannel
-from app.posting.dto import PostingContext
+from app.core.db.config import session_maker
+from app.core.db.models import MagazineChannel, MyChannel
+from app.platforms.telegram.posting.dto import PostingContext
 
 logger = logging.getLogger(__name__)
 

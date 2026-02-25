@@ -1,4 +1,4 @@
-import os
+﻿import os
 import logging
 from aiogram import Router, F
 from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
@@ -8,10 +8,10 @@ from sqlalchemy import select
 from aiogram.fsm.context import FSMContext
 
 
-from app.handlers.for_user import AIChat
-from app.db.models import Payment
-from app.db.crud import closed_menu
-from app.redis_client import redis_client
+from app.platforms.telegram.handlers.user_handlers import AIChat
+from app.core.db.models import Payment
+from app.core.db.crud import closed_menu
+from app.core.redis_client import redis_client
 
 help_router = Router()
 logger = logging.getLogger(__name__)

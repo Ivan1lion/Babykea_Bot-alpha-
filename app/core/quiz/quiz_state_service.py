@@ -1,8 +1,8 @@
-from sqlalchemy.ext.asyncio import AsyncSession
+﻿from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
-from app.db.models import UserQuizProfile, User
-from app.quiz.config_quiz import QUIZ_CONFIG
+from app.core.db.models import UserQuizProfile, User
+from app.core.quiz.config_quiz import QUIZ_CONFIG
 
 
 #Получить или создать профиль квиза. Kвиз продолжался после рестарта, один профиль = одна строка

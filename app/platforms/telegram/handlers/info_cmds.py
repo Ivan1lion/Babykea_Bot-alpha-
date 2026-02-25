@@ -1,4 +1,4 @@
-import os
+﻿import os
 import logging
 from aiogram import F, Router, Bot
 from aiogram.types import Message, CallbackQuery
@@ -10,11 +10,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update
 from sqlalchemy.sql import func
 
-from app.db.models import User
-from app.db.crud import closed_menu
-import app.handlers.keyboards as kb
-from app.redis_client import redis_client
-from app.comands_menu.states import ServiceState
+from app.core.db.models import User
+from app.core.db.crud import closed_menu
+import app.platforms.telegram.keyboards as kb
+from app.core.redis_client import redis_client
+from app.platforms.telegram.handlers.states import ServiceState
 
 
 logger = logging.getLogger(__name__)
