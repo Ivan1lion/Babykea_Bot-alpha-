@@ -156,6 +156,12 @@ async def main():
     app.router.add_get("/health", health)
     app.router.add_post(YOOKASSA_PATH, yookassa_webhook_handler)
 
+    # --- Лендинг оплаты ---
+    from app.web.payment_landing import checkout_page, checkout_process, checkout_success
+    app.router.add_get("/checkout/{token}", checkout_page)
+    app.router.add_post("/checkout/{token}", checkout_process)
+    app.router.add_get("/checkout/{token}/success", checkout_success)
+
     SimpleRequestHandler(dispatcher=dp, bot=bot).register(app, path=WEBHOOK_PATH)
     setup_application(app, dp, bot=bot)
 
