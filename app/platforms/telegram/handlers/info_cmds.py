@@ -1,4 +1,5 @@
 ﻿import os
+import asyncio
 import logging
 from aiogram import F, Router, Bot
 from aiogram.types import Message, CallbackQuery

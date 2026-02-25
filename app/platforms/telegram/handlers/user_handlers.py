@@ -794,8 +794,15 @@ async def process_payment(
     bot: Bot,
     session: AsyncSession,
 ):
-    """Обработка нажатия кнопки оплаты. Вся логика — в core."""
-    from app.core.services.payment_service import create_yookassa_payment
+    """
+    Обработка нажатия кнопки оплаты.
+
+    Два режима (переключается через .env: TG_PAYMENT_MODE):
+      - "native"  — бот шлёт ссылку ЮKassa напрямую
+      - "landing" — бот шлёт ссылку на свой лендинг /checkout/{token}
+    """
+    import os
+    from app.core.services.payment_service import create_yookassa_payment, create_payment_session
     from app.core.services.pay_config import PAYMENTS
 
     telegram_id = callback.from_user.id
@@ -806,25 +813,50 @@ async def process_payment(
         await callback.answer("Неизвестный тариф", show_alert=True)
         return
 
-    return_url = f"https://t.me/{(await bot.me()).username}"
+    mode = os.getenv("TG_PAYMENT_MODE", "native")
 
-    result = await create_yookassa_payment(
-        session=session,
-        telegram_id=telegram_id,
-        payment_type=payment_type,
-        platform="telegram",
-        return_url=return_url,
-    )
+    if mode == "landing":
+        # === РЕЖИМ ЛЕНДИНГА (безопасный) ===
+        ps = await create_payment_session(
+            session=session,
+            telegram_id=telegram_id,
+            payment_type=payment_type,
+            platform="telegram",
+        )
+        if not ps:
+            await callback.message.answer("❌ Ошибка создания сессии оплаты.")
+            return
 
-    if not result.success:
-        await callback.message.answer(f"❌ {result.error}")
-        return
+        webhook_host = os.getenv("WEBHOOK_HOST", "https://bot.mastermanifest.ru")
+        checkout_url = f"{webhook_host}/checkout/{ps.token}"
 
-    await callback.message.answer(
-        cfg["message"],
-        reply_markup=payment_button_keyboard(result.confirmation_url),
-        disable_web_page_preview=True,
-    )
+        await callback.message.answer(
+            cfg["message"],
+            reply_markup=payment_button_keyboard(checkout_url),
+            disable_web_page_preview=True,
+        )
+    else:
+        # === РЕЖИМ NATIVE (напрямую ЮKassa) ===
+        return_url = f"https://t.me/{(await bot.me()).username}"
+
+        result = await create_yookassa_payment(
+            session=session,
+            telegram_id=telegram_id,
+            payment_type=payment_type,
+            platform="telegram",
+            return_url=return_url,
+        )
+
+        if not result.success:
+            await callback.message.answer(f"❌ {result.error}")
+            return
+
+        await callback.message.answer(
+            cfg["message"],
+            reply_markup=payment_button_keyboard(result.confirmation_url),
+            disable_web_page_preview=True,
+        )
+
     await callback.answer()
 
 
