@@ -216,15 +216,3 @@ async def main():
             pass
         finally:
             await graceful_shutdown(worker_task, runner)
-
-
-if __name__ == "__main__":
-    try:
-        if os.name == 'nt':
-            # 🪟 Windows: обязательная политика для корректной работы asyncio
-            asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
-        asyncio.run(main())
-    except KeyboardInterrupt:
-        # Ctrl+C при старте (до запуска event loop) — тихий выход
-        print("Exit")
-        pass  # Убрать print("Exit"), так как logger всё выведет
