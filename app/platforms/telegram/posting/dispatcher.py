@@ -24,8 +24,11 @@ async def dispatch_post(context: PostingContext, message: Message, bot: Bot) -> 
     text_lower = content_text.lower()
     # 3. Проверяем: если есть "#lifestyle" ИЛИ "#nobot" — выходим
     if "#lifestyle" in text_lower or "#nobot" in text_lower:
-        print(f"🙈 Пост {message.message_id} пропущен (фильтр)")
         return  # <--- Ключевой момент: Бот просто выходит из функции здесь
+
+    # --- 🚫 ФИЛЬТР: ВИДЕО-КРУЖКИ (НЕ РАССЫЛАТЬ) ---
+    if message.video_note:
+        return
 
     # СЦЕНАРИЙ 2 и 3: Рассылка Юзерам
     async with session_maker() as session:

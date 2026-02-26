@@ -74,9 +74,13 @@ async def handle_message_new(message: dict, vk_api: API, sm):
     async with sm() as session:
         user = await get_or_create_user_vk(session, vk_id)
 
-        # --- Обработка payload от кнопок (main_menu keyboard) ---
+        # --- Обработка payload от кнопок ---
         if payload:
-            cmd = payload.get("cmd", "")
+            cmd = payload.get("cmd") or payload.get("command", "")
+            # VK системная кнопка «Начать» шлёт {"command": "start"}
+            if cmd == "start":
+                await _handle_start(vk_id, peer_id, user, session, vk_api)
+                return
             await _handle_command(cmd, vk_id, peer_id, user, session, vk_api, sm)
             return
 
@@ -329,7 +333,7 @@ async def _handle_start(vk_id, peer_id, user, session, vk_api):
         vk_api,
         peer_id,
         "",  # Пустая строка, так как текст нам не нужен
-        attachment="video-236264711_456239020_ln-DAKyTAWQvDPmBKAi8y",  # Базовый ID + ключ доступа
+        attachment="video-236264711_456239020",  # Базовый ID + ключ доступа
         keyboard=vk_kb.quiz_start_kb(),
     )
 
