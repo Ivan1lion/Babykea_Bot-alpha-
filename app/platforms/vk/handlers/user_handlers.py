@@ -1038,7 +1038,7 @@ async def _handle_master_text(text, vk_id, peer_id, vk_api):
 # УТИЛИТЫ
 # ============================================================
 
-async def _send(vk_api: API, peer_id: int, text: str, keyboard: str = None):
+async def _send(vk_api: API, peer_id: int, text: str, keyboard: str = None, attachment: str = None):
     """Отправка сообщения через VK API."""
     try:
         # VK имеет лимит 4096 символов на сообщение
@@ -1047,15 +1047,17 @@ async def _send(vk_api: API, peer_id: int, text: str, keyboard: str = None):
             for i, chunk in enumerate(chunks):
                 await vk_api.messages.send(
                     peer_id=peer_id, message=chunk,
-                    random_id=random.randint(1, 2**31),
+                    random_id=random.randint(1, 2 ** 31),
                     keyboard=keyboard if i == len(chunks) - 1 else None,
+                    attachment=attachment if i == 0 else None,
                     dont_parse_links=1,
                 )
         else:
             await vk_api.messages.send(
                 peer_id=peer_id, message=text,
-                random_id=random.randint(1, 2**31),
-                keyboard=keyboard, dont_parse_links=1,
+                random_id=random.randint(1, 2 ** 31),
+                keyboard=keyboard, attachment=attachment,
+                dont_parse_links=1,
             )
     except Exception as e:
         logger.error(f"VK send error to {peer_id}: {e}")
