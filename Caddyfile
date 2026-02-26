@@ -1,0 +1,58 @@
+# ============================================================
+# Babykea Bot — Production Caddyfile
+# ============================================================
+#
+# Архитектура:
+#   bot.babykea.ru → Telegram-бот (порт 8000) + VK-бот (порт 8001)
+#
+# Маршрутизация:
+#   /vk/callback        → VK-бот (8001) — Callback API от VK
+#   /health-vk          → VK-бот (8001) — healthcheck
+#   /* (всё остальное)  → TG-бот (8000) — webhook, ЮKassa, лендинг оплаты
+#
+# Caddy автоматически получает SSL-сертификат от Let's Encrypt.
+#
+# Установка:
+#   1. Положить этот файл: /etc/caddy/Caddyfile
+#   2. sudo systemctl reload caddy
+#
+# ============================================================
+
+bot.babykea.ru {
+    # --- Логирование ---
+    log {
+        output file /var/log/caddy/babykea-bot.log {
+            roll_size 10mb
+            roll_keep 5
+        }
+        format json
+    }
+
+    # --- Security headers ---
+    header {
+        X-Content-Type-Options nosniff
+        X-Frame-Options DENY
+        Referrer-Policy strict-origin-when-cross-origin
+        -Server
+    }
+
+    # --- VK Callback API → порт 8001 ---
+    handle /vk/callback {
+        reverse_proxy localhost:8001
+    }
+
+    # --- VK healthcheck ---
+    handle /health-vk {
+        reverse_proxy localhost:8001
+    }
+
+    # --- Всё остальное → Telegram-бот (порт 8000) ---
+    # Включает:
+    #   /webhook           — Telegram webhook
+    #   /yookassa/webhook  — ЮKassa webhook
+    #   /checkout/{token}  — лендинг оплаты (общий для TG и VK)
+    #   /health            — healthcheck
+    handle {
+        reverse_proxy localhost:8000
+    }
+}
