@@ -36,6 +36,7 @@ def _cache_key(platform_id: int, platform: str = "telegram") -> str:
 async def get_user_cached(
     session: AsyncSession,
     platform_id: int,
+    *,
     platform: str = "telegram",
 ) -> UserCache | None:
     """
@@ -83,6 +84,7 @@ async def get_user_cached(
 async def try_reserve_request(
     session: AsyncSession,
     platform_id: int,
+    *,
     platform: str = "telegram",
 ) -> bool:
     """
@@ -116,7 +118,7 @@ async def try_reserve_request(
     return False
 
 
-async def refund_request(platform_id: int, platform: str = "telegram"):
+async def refund_request(platform_id: int, *, platform: str = "telegram"):
     """
     Возвращает 1 запрос юзеру при ошибке LLM.
     Использует собственную сессию — вызывается из except-блока фоновой задачи.
@@ -141,6 +143,7 @@ async def update_user_requests(
     session: AsyncSession,
     platform_id: int,
     decrement: int = 1,
+    *,
     platform: str = "telegram",
 ):
     """
@@ -164,6 +167,7 @@ async def update_user_requests(
 async def update_user_flags(
     session: AsyncSession,
     platform_id: int,
+    *,
     platform: str = "telegram",
     **kwargs,
 ):

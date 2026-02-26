@@ -32,7 +32,7 @@ from app.core.redis_client import redis_client as redis
 from app.platforms.vk.bot import create_vk_api, VK_GROUP_ID
 from app.platforms.vk.callback import vk_callback_handler
 from app.web.webhooks import yookassa_webhook_handler
-from app.web.payment_landing import checkout_page, checkout_process, checkout_success
+
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(
