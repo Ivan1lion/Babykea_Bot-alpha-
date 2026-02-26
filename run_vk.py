@@ -71,10 +71,6 @@ async def main():
     app.router.add_post(VK_CALLBACK_PATH, vk_callback_handler)
     app.router.add_post(YOOKASSA_PATH, yookassa_webhook_handler)
 
-    # Лендинг оплаты (общий для TG и VK)
-    app.router.add_get("/checkout/{token}", checkout_page)
-    app.router.add_post("/checkout/{token}", checkout_process)
-    app.router.add_get("/checkout/{token}/success", checkout_success)
 
     # === 4. Запуск ===
     runner = web.AppRunner(app)
