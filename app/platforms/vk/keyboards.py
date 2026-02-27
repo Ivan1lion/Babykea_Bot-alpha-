@@ -1,97 +1,97 @@
 """
 VK-клавиатуры — полный набор, аналог Telegram keyboards.
 
-VK типы клавиатур:
-  - inline=True  → прикреплена к сообщению (как Telegram InlineKeyboard)
-  - inline=False → внизу чата (как Telegram ReplyKeyboard)
+ВАЖНО: Все inline-кнопки используют тип Callback (не Text!).
+  - Text кнопки дублируют текст в чат (как отправленное сообщение)
+  - Callback кнопки работают "тихо" — генерируют message_event
 
-VK кнопки:
-  - Text(label, payload) → обычная кнопка с callback
-  - OpenLink(link, label) → кнопка-ссылка
+VK типы клавиатур:
+  - inline=True  → прикреплена к сообщению (Callback-кнопки)
+  - inline=False → внизу чата (Text-кнопки для главного меню)
 """
 
 import json
-from vkbottle import Keyboard, KeyboardButtonColor, Text, OpenLink
+from vkbottle import Keyboard, KeyboardButtonColor, Text, Callback, OpenLink
 
 
 # ============================================================
-# INLINE — прикреплены к сообщению
+# INLINE — прикреплены к сообщению (Callback — "тихие")
 # ============================================================
 
 def quiz_start_kb() -> str:
     kb = Keyboard(inline=True)
-    kb.add(Text("Далее 👉", payload={"cmd": "quiz:start"}), color=KeyboardButtonColor.PRIMARY)
+    kb.add(Callback("Далее 👉", payload={"cmd": "quiz:start"}), color=KeyboardButtonColor.PRIMARY)
     return kb.get_json()
 
 
 def quiz_false_kb() -> str:
     kb = Keyboard(inline=True)
-    kb.add(Text("🔄 Перезапуск", payload={"cmd": "quiz:restore"}), color=KeyboardButtonColor.NEGATIVE)
+    kb.add(Callback("🔄 Перезапуск", payload={"cmd": "quiz:restore"}), color=KeyboardButtonColor.NEGATIVE)
     return kb.get_json()
 
 
 def activation_kb() -> str:
     kb = Keyboard(inline=True)
-    kb.add(Text("💳 Оплатить", payload={"cmd": "pay_access"}), color=KeyboardButtonColor.POSITIVE)
+    kb.add(Callback("💳 Оплатить", payload={"cmd": "pay_access"}), color=KeyboardButtonColor.POSITIVE)
     kb.row()
-    kb.add(Text("🔑 Ввести код активации", payload={"cmd": "enter_promo"}))
+    kb.add(Callback("🔑 Ввести код активации", payload={"cmd": "enter_promo"}))
     return kb.get_json()
 
 
 def kb_activation() -> str:
     kb = Keyboard(inline=True)
-    kb.add(Text("Всё ясно, погнали! 🚀", payload={"cmd": "kb_activation"}), color=KeyboardButtonColor.PRIMARY)
+    kb.add(Callback("Всё ясно, погнали! 🚀", payload={"cmd": "kb_activation"}), color=KeyboardButtonColor.PRIMARY)
     return kb.get_json()
 
 
 def first_request_kb() -> str:
     kb = Keyboard(inline=True)
-    kb.add(Text("Подобрать коляску 🎯", payload={"cmd": "first_request"}), color=KeyboardButtonColor.PRIMARY)
+    kb.add(Callback("Подобрать коляску 🎯", payload={"cmd": "first_request"}), color=KeyboardButtonColor.PRIMARY)
     return kb.get_json()
 
 
 def rules_mode_kb() -> str:
     kb = Keyboard(inline=True)
-    kb.add(Text("💢 Как не сломать коляску", payload={"cmd": "rules_mode"}), color=KeyboardButtonColor.PRIMARY)
+    kb.add(Callback("💢 Как не сломать коляску", payload={"cmd": "rules_mode"}), color=KeyboardButtonColor.PRIMARY)
     return kb.get_json()
 
 
 def next_service_kb() -> str:
     kb = Keyboard(inline=True)
-    kb.add(Text("Следующий шаг ➡️", payload={"cmd": "next_service"}), color=KeyboardButtonColor.PRIMARY)
+    kb.add(Callback("Следующий шаг ➡️", payload={"cmd": "next_service"}), color=KeyboardButtonColor.PRIMARY)
     return kb.get_json()
 
 
 def get_wb_link_kb() -> str:
     kb = Keyboard(inline=True)
-    kb.add(Text("🟣 Смазка на WB", payload={"cmd": "get_wb_link"}), color=KeyboardButtonColor.PRIMARY)
+    kb.add(Callback("🟣 Смазка на WB", payload={"cmd": "get_wb_link"}), color=KeyboardButtonColor.PRIMARY)
     return kb.get_json()
 
 
 def ai_mode_kb() -> str:
     kb = Keyboard(inline=True)
-    kb.add(Text("🎯 Подобрать коляску", payload={"cmd": "mode_catalog"}), color=KeyboardButtonColor.PRIMARY)
+    kb.add(Callback("🎯 Подобрать коляску", payload={"cmd": "mode_catalog"}), color=KeyboardButtonColor.PRIMARY)
     kb.row()
-    kb.add(Text("❓ Другой запрос", payload={"cmd": "mode_info"}))
+    kb.add(Callback("❓ Другой запрос", payload={"cmd": "mode_info"}))
     return kb.get_json()
 
 
 def ai_mode_with_balance_kb() -> str:
     kb = Keyboard(inline=True)
-    kb.add(Text("🎯 Подобрать коляску", payload={"cmd": "mode_catalog"}), color=KeyboardButtonColor.PRIMARY)
+    kb.add(Callback("🎯 Подобрать коляску", payload={"cmd": "mode_catalog"}), color=KeyboardButtonColor.PRIMARY)
     kb.row()
-    kb.add(Text("❓ Другой запрос", payload={"cmd": "mode_info"}))
+    kb.add(Callback("❓ Другой запрос", payload={"cmd": "mode_info"}))
     kb.row()
-    kb.add(Text("➕ Пополнить баланс 💳", payload={"cmd": "top_up_balance"}), color=KeyboardButtonColor.POSITIVE)
+    kb.add(Callback("➕ Пополнить баланс 💳", payload={"cmd": "top_up_balance"}), color=KeyboardButtonColor.POSITIVE)
     return kb.get_json()
 
 
 def pay_kb() -> str:
     kb = Keyboard(inline=True)
-    kb.add(Text("1 запрос — 29₽", payload={"cmd": "pay29"}))
-    kb.add(Text("50 запросов — 950₽", payload={"cmd": "pay950"}))
+    kb.add(Callback("1 запрос — 29₽", payload={"cmd": "pay29"}))
+    kb.add(Callback("50 запросов — 950₽", payload={"cmd": "pay950"}))
     kb.row()
-    kb.add(Text("10 запросов — 190₽", payload={"cmd": "pay190"}))
+    kb.add(Callback("10 запросов — 190₽", payload={"cmd": "pay190"}))
     return kb.get_json()
 
 
@@ -115,13 +115,13 @@ def magazine_map_kb(map_url: str | None) -> str | None:
 
 def config_kb() -> str:
     kb = Keyboard(inline=True)
-    kb.add(Text("🔑 Промокод", payload={"cmd": "promo"}))
-    kb.add(Text("🛠 Плановое ТО", payload={"cmd": "service"}))
+    kb.add(Callback("🔑 Промокод", payload={"cmd": "promo"}))
+    kb.add(Callback("🛠 Плановое ТО", payload={"cmd": "service"}))
     kb.row()
-    kb.add(Text("🔄 Квиз заново", payload={"cmd": "quiz_restart"}))
-    kb.add(Text("📧 Email", payload={"cmd": "email"}))
+    kb.add(Callback("🔄 Квиз заново", payload={"cmd": "quiz_restart"}))
+    kb.add(Callback("📧 Email", payload={"cmd": "email"}))
     kb.row()
-    kb.add(Text("📃 Оферта", payload={"cmd": "offer"}))
+    kb.add(Callback("📃 Оферта", payload={"cmd": "offer"}))
     return kb.get_json()
 
 
@@ -131,7 +131,7 @@ def config_kb() -> str:
 
 def blog_kb() -> str:
     kb = Keyboard(inline=True)
-    kb.add(Text("🔔 Вкл/Откл рассылку", payload={"cmd": "toggle_blog_sub"}))
+    kb.add(Callback("🔔 Вкл/Откл рассылку", payload={"cmd": "toggle_blog_sub"}))
     return kb.get_json()
 
 
@@ -141,15 +141,15 @@ def blog_kb() -> str:
 
 def help_kb() -> str:
     kb = Keyboard(inline=True)
-    kb.add(Text("«Скрипит!»", payload={"cmd": "faq_1"}))
-    kb.add(Text("«Снять колеса»", payload={"cmd": "faq_2"}))
+    kb.add(Callback("«Скрипит!»", payload={"cmd": "faq_1"}))
+    kb.add(Callback("«Снять колеса»", payload={"cmd": "faq_2"}))
     kb.row()
-    kb.add(Text("«Голова ниже ног»", payload={"cmd": "faq_3"}))
-    kb.add(Text("«Атмосферы»", payload={"cmd": "faq_4"}))
+    kb.add(Callback("«Голова ниже ног»", payload={"cmd": "faq_3"}))
+    kb.add(Callback("«Атмосферы»", payload={"cmd": "faq_4"}))
     kb.row()
-    kb.add(Text("🤖 Спросить AI", payload={"cmd": "ai_info"}), color=KeyboardButtonColor.PRIMARY)
+    kb.add(Callback("🤖 Спросить AI", payload={"cmd": "ai_info"}), color=KeyboardButtonColor.PRIMARY)
     kb.row()
-    kb.add(Text("✍️ Написать мастеру", payload={"cmd": "contact_master"}))
+    kb.add(Callback("✍️ Написать мастеру", payload={"cmd": "contact_master"}))
     return kb.get_json()
 
 
@@ -159,17 +159,17 @@ def help_kb() -> str:
 
 def master_start_kb() -> str:
     kb = Keyboard(inline=True)
-    kb.add(Text("💬 Поделиться историей", payload={"cmd": "mf_start"}), color=KeyboardButtonColor.PRIMARY)
+    kb.add(Callback("💬 Поделиться историей", payload={"cmd": "mf_start"}), color=KeyboardButtonColor.PRIMARY)
     return kb.get_json()
 
 
 # ============================================================
-# КВИЗ — динамическая клавиатура
+# КВИЗ — динамическая клавиатура (Callback)
 # ============================================================
 
 def build_quiz_keyboard(step: dict, profile, selected: str | None = None) -> str:
     """
-    Строит VK inline-клавиатуру для шага квиза.
+    Строит VK inline-клавиатуру (Callback) для шага квиза.
     Аналог renderer.build_keyboard() из Telegram.
     """
     kb = Keyboard(inline=True)
@@ -179,27 +179,29 @@ def build_quiz_keyboard(step: dict, profile, selected: str | None = None) -> str
         if selected == option_key:
             text = f"✅ {text}"
 
-        kb.add(Text(text, payload={"cmd": f"quiz:select:{option_key}"}))
+        kb.add(Callback(text, payload={"cmd": f"quiz:select:{option_key}"}))
         kb.row()
 
-    # Навигация
-    nav_row = []
+    # Навигация — "Назад" и "Далее" на одной строке
     if profile.current_level > 1:
-        kb.add(Text("⬅ Назад", payload={"cmd": "quiz:back"}))
+        kb.add(Callback("⬅ Назад", payload={"cmd": "quiz:back"}))
 
-    kb.add(Text("Далее ➡", payload={"cmd": "quiz:next"}), color=KeyboardButtonColor.PRIMARY)
+    kb.add(Callback("Далее ➡", payload={"cmd": "quiz:next"}), color=KeyboardButtonColor.PRIMARY)
 
     return kb.get_json()
 
 
 # ============================================================
 # ГЛАВНОЕ МЕНЮ (reply keyboard — внизу чата)
+# Здесь ОСТАЁТСЯ Text — это НЕ inline, а кнопки внизу экрана.
+# Они должны быть Text, т.к. VK не поддерживает Callback
+# для обычных (не inline) клавиатур.
 # ============================================================
 
 def main_menu_kb() -> str:
     """
     Главное меню — аналог команд Telegram.
-    VK не поддерживает /команды, поэтому используем кнопки.
+    VK не поддерживает /команды, поэтому используем Text-кнопки.
     """
     kb = Keyboard(one_time=False)
     kb.add(Text("🤖 AI-консультант", payload={"cmd": "ai_consultant"}), color=KeyboardButtonColor.PRIMARY)

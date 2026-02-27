@@ -74,13 +74,9 @@ async def handle_message_new(message: dict, vk_api: API, sm):
     async with sm() as session:
         user = await get_or_create_user_vk(session, vk_id)
 
-        # --- Обработка payload от кнопок ---
+        # --- Обработка payload от кнопок (main_menu keyboard) ---
         if payload:
-            cmd = payload.get("cmd") or payload.get("command", "")
-            # VK системная кнопка «Начать» шлёт {"command": "start"}
-            if cmd == "start":
-                await _handle_start(vk_id, peer_id, user, session, vk_api)
-                return
+            cmd = payload.get("cmd", "")
             await _handle_command(cmd, vk_id, peer_id, user, session, vk_api, sm)
             return
 
@@ -146,17 +142,18 @@ async def handle_message_new(message: dict, vk_api: API, sm):
 # ============================================================
 
 async def handle_message_event(event: dict, vk_api: API, sm):
-    """Обрабатывает нажатие inline-кнопки (message_event)."""
+    """Обрабатывает нажатие Callback-кнопки (message_event)."""
     vk_id = event.get("user_id")
     peer_id = event.get("peer_id", vk_id)
     payload = event.get("payload", {})
     event_id = event.get("event_id")
+    conversation_message_id = event.get("conversation_message_id")
     cmd = payload.get("cmd", "")
 
     if not vk_id:
         return
 
-    # Подтверждаем событие (убирает спиннер с кнопки)
+    # Подтверждаем событие (убирает спиннер с Callback-кнопки)
     with contextlib.suppress(Exception):
         await vk_api.messages.send_message_event_answer(
             event_id=event_id, user_id=vk_id, peer_id=peer_id,
@@ -164,14 +161,16 @@ async def handle_message_event(event: dict, vk_api: API, sm):
 
     async with sm() as session:
         user = await get_or_create_user_vk(session, vk_id)
-        await _handle_command(cmd, vk_id, peer_id, user, session, vk_api, sm)
+        await _handle_command(cmd, vk_id, peer_id, user, session, vk_api, sm,
+                              conversation_message_id=conversation_message_id)
 
 
 # ============================================================
 # ЦЕНТРАЛЬНЫЙ РОУТЕР КОМАНД
 # ============================================================
 
-async def _handle_command(cmd, vk_id, peer_id, user, session, vk_api, sm=None):
+async def _handle_command(cmd, vk_id, peer_id, user, session, vk_api, sm=None,
+                          conversation_message_id=None):
     """Маршрутизация команд из payload кнопок и текстового меню."""
 
     # === Старт / Активация ===
@@ -286,20 +285,20 @@ async def _handle_command(cmd, vk_id, peer_id, user, session, vk_api, sm=None):
 
     # === Квиз ===
     elif cmd == "quiz:start":
-        await _handle_quiz_start(vk_id, peer_id, session, vk_api)
+        await _handle_quiz_start(vk_id, peer_id, session, vk_api, conversation_message_id)
 
     elif cmd and cmd.startswith("quiz:select:"):
         option = cmd.split(":")[2]
-        await _handle_quiz_select(vk_id, peer_id, option, session, vk_api)
+        await _handle_quiz_select(vk_id, peer_id, option, session, vk_api, conversation_message_id)
 
     elif cmd == "quiz:next":
-        await _handle_quiz_next(vk_id, peer_id, session, vk_api)
+        await _handle_quiz_next(vk_id, peer_id, session, vk_api, conversation_message_id)
 
     elif cmd == "quiz:back":
-        await _handle_quiz_back(vk_id, peer_id, session, vk_api)
+        await _handle_quiz_back(vk_id, peer_id, session, vk_api, conversation_message_id)
 
     elif cmd == "quiz:restore":
-        await _handle_quiz_start(vk_id, peer_id, session, vk_api)
+        await _handle_quiz_start(vk_id, peer_id, session, vk_api, conversation_message_id)
 
     # === FAQ ===
     elif cmd in ("faq_1", "faq_2", "faq_3", "faq_4"):
@@ -333,7 +332,7 @@ async def _handle_start(vk_id, peer_id, user, session, vk_api):
         vk_api,
         peer_id,
         "",  # Пустая строка, так как текст нам не нужен
-        attachment="video-236264711_456239020",  # Базовый ID + ключ доступа
+        attachment="video-236264711_456239020_ln-DAKyTAWQvDPmBKAi8y",  # Базовый ID + ключ доступа
         keyboard=vk_kb.quiz_start_kb(),
     )
 
@@ -870,11 +869,29 @@ async def _handle_promo_code(code, vk_id, peer_id, user, session, vk_api):
 
 
 # ============================================================
-# КВИЗ (текстовый — без фото, т.к. VK не поддерживает edit_message_media)
+# КВИЗ — с Callback-кнопками и messages.edit (как в Telegram)
 # ============================================================
 
-async def _handle_quiz_start(vk_id, peer_id, session, vk_api):
-    """Старт/рестарт квиза."""
+def _get_quiz_photo_vk(step: dict, selected: str | None = None) -> str | None:
+    """Получает VK photo attachment для шага квиза."""
+    if selected:
+        option = step["options"].get(selected)
+        if option and "preview" in option:
+            return option["preview"].get("photo_vk")
+    return step.get("photo_vk")
+
+
+def _get_quiz_text_vk(step: dict, selected: str | None = None) -> str:
+    """Получает текст для VK (plain text, без HTML)."""
+    if selected:
+        option = step["options"].get(selected)
+        if option and "preview" in option:
+            return option["preview"].get("text_vk") or _strip_html(option["preview"].get("text", ""))
+    return step.get("text_vk") or _strip_html(step.get("text", ""))
+
+
+async def _handle_quiz_start(vk_id, peer_id, session, vk_api, cmid=None):
+    """Старт/рестарт квиза — отправляем НОВОЕ сообщение."""
     user = await get_or_create_user_vk(session, vk_id)
     profile = await get_or_create_quiz_profile(session, user)
 
@@ -887,11 +904,16 @@ async def _handle_quiz_start(vk_id, peer_id, session, vk_api):
     session.add(profile)
     await session.commit()
 
-    await _render_quiz_step_vk(vk_api, peer_id, profile)
+    # Удаляем старое сообщение с кнопками (если было)
+    if cmid:
+        await _edit(vk_api, peer_id, cmid, "⏳ Загрузка квиза...")
+
+    # Отправляем НОВОЕ сообщение (первый шаг квиза)
+    await _render_quiz_step_vk(vk_api, peer_id, profile, session=session, send_new=True)
 
 
-async def _handle_quiz_select(vk_id, peer_id, option, session, vk_api):
-    """Выбор варианта в квизе."""
+async def _handle_quiz_select(vk_id, peer_id, option, session, vk_api, cmid=None):
+    """Выбор варианта — РЕДАКТИРУЕМ текущее сообщение."""
     user = await get_or_create_user_vk(session, vk_id)
     profile = await get_or_create_quiz_profile(session, user)
 
@@ -899,11 +921,12 @@ async def _handle_quiz_select(vk_id, peer_id, option, session, vk_api):
     session.add(profile)
     await session.commit()
 
-    await _render_quiz_step_vk(vk_api, peer_id, profile, selected=option)
+    # Редактируем сообщение — меняем текст и кнопки
+    await _render_quiz_step_vk(vk_api, peer_id, profile, selected=option, cmid=cmid, session=session)
 
 
-async def _handle_quiz_next(vk_id, peer_id, session, vk_api):
-    """Кнопка «Далее» в квизе."""
+async def _handle_quiz_next(vk_id, peer_id, session, vk_api, cmid=None):
+    """Кнопка «Далее» — переход на следующий шаг."""
     user = await get_or_create_user_vk(session, vk_id)
     profile = await get_or_create_quiz_profile(session, user)
 
@@ -920,9 +943,13 @@ async def _handle_quiz_next(vk_id, peer_id, session, vk_api):
     await session.commit()
 
     if profile.completed:
+        # Убираем кнопки со старого сообщения
+        if cmid:
+            await _edit(vk_api, peer_id, cmid, "✅ Квиз завершён!")
+
         if profile.completed_once:
             await _send(vk_api, peer_id,
-                        "✅ Квиз завершён\n\nВаши ответы обновлены.",
+                        "✅ Квиз завершён\\n\\nВаши ответы обновлены.",
                         keyboard=vk_kb.ai_mode_kb())
             return
 
@@ -932,23 +959,38 @@ async def _handle_quiz_next(vk_id, peer_id, session, vk_api):
 
         await _send(
             vk_api, peer_id,
-            "✅ Отлично! Квиз-опрос завершён\n\n"
+            "✅ Отлично! Квиз-опрос завершён\\n\\n"
             "Теперь у меня есть понимание ситуации. Данные помогут "
-            "подбирать модели именно под ваши условия.\n\n"
+            "подбирать модели именно под ваши условия.\\n\\n"
             "Остался последний шаг — открыть доступ к подбору и рекомендациям",
             keyboard=vk_kb.activation_kb(),
         )
         return
 
-    await _render_quiz_step_vk(vk_api, peer_id, profile)
+    # Переход на следующий шаг — НОВОЕ сообщение (т.к. может быть новое фото)
+    # Убираем кнопки со старого сообщения
+    if cmid:
+        await _edit(vk_api, peer_id, cmid, _get_quiz_text_vk(step, selected))
+
+    await _render_quiz_step_vk(vk_api, peer_id, profile, session=session, send_new=True)
 
 
-async def _handle_quiz_back(vk_id, peer_id, session, vk_api):
-    """Кнопка «Назад» в квизе."""
+async def _handle_quiz_back(vk_id, peer_id, session, vk_api, cmid=None):
+    """Кнопка «Назад»."""
     user = await get_or_create_user_vk(session, vk_id)
     profile = await get_or_create_quiz_profile(session, user)
     await go_back(session, profile)
-    await _render_quiz_step_vk(vk_api, peer_id, profile)
+
+    # Убираем кнопки со старого, отправляем новое
+    if cmid:
+        branch = profile.branch or "root"
+        try:
+            step = QUIZ_CONFIG[branch][profile.current_level]
+            await _edit(vk_api, peer_id, cmid, _get_quiz_text_vk(step))
+        except KeyError:
+            pass
+
+    await _render_quiz_step_vk(vk_api, peer_id, profile, session=session, send_new=True)
 
 
 async def _handle_quiz_restart(vk_id, peer_id, session, vk_api):
@@ -956,8 +998,13 @@ async def _handle_quiz_restart(vk_id, peer_id, session, vk_api):
     await _handle_quiz_start(vk_id, peer_id, session, vk_api)
 
 
-async def _render_quiz_step_vk(vk_api, peer_id, profile, selected=None):
-    """Рендерит шаг квиза для VK (текст + inline-кнопки)."""
+async def _render_quiz_step_vk(vk_api, peer_id, profile, selected=None,
+                                cmid=None, session=None, send_new=False):
+    """Рендерит шаг квиза для VK.
+
+    cmid — conversation_message_id для редактирования.
+    send_new=True — отправить новым сообщением (для смены фото).
+    """
     try:
         branch = profile.branch or "root"
         step = QUIZ_CONFIG[branch][profile.current_level]
@@ -966,9 +1013,16 @@ async def _render_quiz_step_vk(vk_api, peer_id, profile, selected=None):
                     keyboard=vk_kb.quiz_start_kb())
         return
 
-    text = step.get("text", "")
+    text = _get_quiz_text_vk(step, selected)
     keyboard = vk_kb.build_quiz_keyboard(step, profile, selected)
-    await _send(vk_api, peer_id, text, keyboard=keyboard)
+    photo_vk = _get_quiz_photo_vk(step, selected)
+
+    if cmid and not send_new:
+        # РЕДАКТИРУЕМ существующее сообщение (выбор варианта)
+        await _edit(vk_api, peer_id, cmid, text, keyboard=keyboard, attachment=photo_vk)
+    else:
+        # ОТПРАВЛЯЕМ новое сообщение (новый шаг, новое фото)
+        await _send(vk_api, peer_id, text, keyboard=keyboard, attachment=photo_vk)
 
 
 # ============================================================
@@ -1042,24 +1096,69 @@ async def _handle_master_text(text, vk_id, peer_id, vk_api):
 # УТИЛИТЫ
 # ============================================================
 
+async def _edit(vk_api: API, peer_id: int, conversation_message_id: int,
+                text: str, keyboard: str = None, attachment: str = None):
+    """Редактирует сообщение бота в VK (аналог edit_message в Telegram)."""
+    try:
+        kwargs = {
+            "peer_id": peer_id,
+            "conversation_message_id": conversation_message_id,
+            "message": text or " ",
+        }
+        if keyboard:
+            kwargs["keyboard"] = keyboard
+        else:
+            # Убираем клавиатуру (пустая inline-клавиатура)
+            from vkbottle import Keyboard
+            kwargs["keyboard"] = Keyboard(inline=True).get_json()
+        if attachment:
+            kwargs["attachment"] = attachment
+
+        await vk_api.messages.edit(**kwargs)
+    except Exception as e:
+        logger.error(f"VK edit error (cmid={conversation_message_id}): {e}")
+
+
+async def _edit(vk_api: API, peer_id: int, conversation_message_id: int,
+                text: str, keyboard: str = None, attachment: str = None):
+    """Редактирует сообщение бота в VK (аналог edit_message в Telegram)."""
+    try:
+        kwargs = {
+            "peer_id": peer_id,
+            "conversation_message_id": conversation_message_id,
+            "message": text or " ",
+        }
+        if keyboard:
+            kwargs["keyboard"] = keyboard
+        if attachment:
+            kwargs["attachment"] = attachment
+
+        await vk_api.messages.edit(**kwargs)
+    except Exception as e:
+        logger.error(f"VK edit error (cmid={conversation_message_id}): {e}")
+
+
 async def _send(vk_api: API, peer_id: int, text: str, keyboard: str = None, attachment: str = None):
     """Отправка сообщения через VK API."""
     try:
+        # VK требует непустое сообщение
+        if not text and not attachment:
+            text = " "
         # VK имеет лимит 4096 символов на сообщение
-        if len(text) > 4000:
+        if len(text or "") > 4000:
             chunks = [text[i:i+4000] for i in range(0, len(text), 4000)]
             for i, chunk in enumerate(chunks):
                 await vk_api.messages.send(
                     peer_id=peer_id, message=chunk,
-                    random_id=random.randint(1, 2 ** 31),
+                    random_id=random.randint(1, 2**31),
                     keyboard=keyboard if i == len(chunks) - 1 else None,
                     attachment=attachment if i == 0 else None,
                     dont_parse_links=1,
                 )
         else:
             await vk_api.messages.send(
-                peer_id=peer_id, message=text,
-                random_id=random.randint(1, 2 ** 31),
+                peer_id=peer_id, message=text or " ",
+                random_id=random.randint(1, 2**31),
                 keyboard=keyboard, attachment=attachment,
                 dont_parse_links=1,
             )
