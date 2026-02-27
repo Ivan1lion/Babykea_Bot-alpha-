@@ -76,7 +76,15 @@ async def handle_message_new(message: dict, vk_api: API, sm):
 
         # --- Обработка payload от кнопок (main_menu keyboard) ---
         if payload:
-            cmd = payload.get("cmd", "")
+            # Умный переключатель: ищет либо cmd (от наших кнопок), либо command (от системной ВК)
+            cmd = payload.get("cmd") or payload.get("command", "")
+
+            # Перехватываем системную кнопку "Начать"
+            if cmd == "start":
+                await _handle_start(vk_id, peer_id, user, session, vk_api)
+                return
+
+            # Передаем все остальные кнопки (включая квиз) в маршрутизатор
             await _handle_command(cmd, vk_id, peer_id, user, session, vk_api, sm)
             return
 
@@ -162,7 +170,8 @@ async def handle_message_event(event: dict, vk_api: API, sm):
     async with sm() as session:
         user = await get_or_create_user_vk(session, vk_id)
         await _handle_command(cmd, vk_id, peer_id, user, session, vk_api, sm,
-                              conversation_message_id=conversation_message_id)
+                              conversation_message_id=conversation_message_id,
+                              event_id=event_id)
 
 
 # ============================================================
@@ -170,7 +179,7 @@ async def handle_message_event(event: dict, vk_api: API, sm):
 # ============================================================
 
 async def _handle_command(cmd, vk_id, peer_id, user, session, vk_api, sm=None,
-                          conversation_message_id=None):
+                          conversation_message_id=None, event_id=None):
     """Маршрутизация команд из payload кнопок и текстового меню."""
 
     # === Старт / Активация ===
@@ -292,7 +301,7 @@ async def _handle_command(cmd, vk_id, peer_id, user, session, vk_api, sm=None,
         await _handle_quiz_select(vk_id, peer_id, option, session, vk_api, conversation_message_id)
 
     elif cmd == "quiz:next":
-        await _handle_quiz_next(vk_id, peer_id, session, vk_api, conversation_message_id)
+        await _handle_quiz_next(vk_id, peer_id, session, vk_api, conversation_message_id, event_id)
 
     elif cmd == "quiz:back":
         await _handle_quiz_back(vk_id, peer_id, session, vk_api, conversation_message_id)
@@ -316,16 +325,6 @@ async def _handle_command(cmd, vk_id, peer_id, user, session, vk_api, sm=None,
 # ОСНОВНЫЕ ФУНКЦИИ
 # ============================================================
 
-# async def _handle_start(vk_id, peer_id, user, session, vk_api):
-#     """Приветствие — аналог /start."""
-#     await _send(
-#         vk_api, peer_id,
-#         "👋 Привет! Я — Babykea Bot\n\n"
-#         "🔍 Помогу подобрать коляску под ваши задачи (AI-подбор + видеорекомендации)\n"
-#         "🛠 Покажу, что делать после покупки и чего делать НЕЛЬЗЯ\n\n"
-#         "Для начала пройдите короткий квиз-опрос 👇",
-#         keyboard=vk_kb.quiz_start_kb(),
-#     )
 async def _handle_start(vk_id, peer_id, user, session, vk_api):
     """Приветствие — аналог /start (только видео + кнопка)."""
     await _send(
@@ -904,12 +903,17 @@ async def _handle_quiz_start(vk_id, peer_id, session, vk_api, cmid=None):
     session.add(profile)
     await session.commit()
 
-    # Удаляем старое сообщение с кнопками (если было)
+    # Удаляем предыдущее сообщение с кнопкой
     if cmid:
-        await _edit(vk_api, peer_id, cmid, "⏳ Загрузка квиза...")
+        with contextlib.suppress(Exception):
+            await vk_api.messages.delete(
+                peer_id=peer_id,
+                conversation_message_ids=[cmid],
+                delete_for_all=True,
+            )
 
-    # Отправляем НОВОЕ сообщение (первый шаг квиза)
-    await _render_quiz_step_vk(vk_api, peer_id, profile, session=session, send_new=True)
+    # Отправляем первый шаг квиза НОВЫМ сообщением
+    await _render_quiz_step_vk(vk_api, peer_id, profile, send_new=True)
 
 
 async def _handle_quiz_select(vk_id, peer_id, option, session, vk_api, cmid=None):
@@ -925,7 +929,7 @@ async def _handle_quiz_select(vk_id, peer_id, option, session, vk_api, cmid=None
     await _render_quiz_step_vk(vk_api, peer_id, profile, selected=option, cmid=cmid, session=session)
 
 
-async def _handle_quiz_next(vk_id, peer_id, session, vk_api, cmid=None):
+async def _handle_quiz_next(vk_id, peer_id, session, vk_api, cmid=None, event_id=None):
     """Кнопка «Далее» — переход на следующий шаг."""
     user = await get_or_create_user_vk(session, vk_id)
     profile = await get_or_create_quiz_profile(session, user)
@@ -934,7 +938,14 @@ async def _handle_quiz_next(vk_id, peer_id, session, vk_api, cmid=None):
     selected = profile.data.get("_selected")
 
     if not validate_next(selected):
-        await _send(vk_api, peer_id, "⚠️ Выберите вариант, затем нажмите «Далее»")
+        # Показываем snackbar (всплывающий тост) — аналог alert в Telegram
+        if event_id:
+            with contextlib.suppress(Exception):
+                await vk_api.messages.send_message_event_answer(
+                    event_id=event_id, user_id=vk_id, peer_id=peer_id,
+                    event_data=json.dumps({"type": "show_snackbar",
+                                           "text": "⚠️ Выберите вариант, затем нажмите «Далее»"})
+                )
         return
 
     await save_and_next(session=session, profile=profile, step=step, selected_option=selected)
@@ -943,36 +954,46 @@ async def _handle_quiz_next(vk_id, peer_id, session, vk_api, cmid=None):
     await session.commit()
 
     if profile.completed:
-        # Убираем кнопки со старого сообщения
+        # Убираем квиз-сообщение
         if cmid:
-            await _edit(vk_api, peer_id, cmid, "✅ Квиз завершён!")
+            with contextlib.suppress(Exception):
+                await vk_api.messages.delete(
+                    peer_id=peer_id,
+                    conversation_message_ids=[cmid],
+                    delete_for_all=True,
+                )
 
         if profile.completed_once:
+            # Повторное прохождение
             await _send(vk_api, peer_id,
-                        "✅ Квиз завершён\\n\\nВаши ответы обновлены.",
+                        "✅ Квиз завершён\n\nВаши ответы обновлены",
                         keyboard=vk_kb.ai_mode_kb())
             return
 
+        # Первое прохождение — GIF + текст + кнопка
         profile.completed_once = True
         session.add(profile)
         await session.commit()
 
+        # GIF: загрузи в альбом группы, возьми ID (формат: doc-236264711_XXXXXXX)
+        # Пока без GIF — просто текст. Когда загрузишь, добавь attachment=
         await _send(
             vk_api, peer_id,
-            "✅ Отлично! Квиз-опрос завершён\\n\\n"
+            "✅ Отлично! Квиз-опрос завершён\n\n"
             "Теперь у меня есть понимание ситуации. Данные помогут "
-            "подбирать модели именно под ваши условия.\\n\\n"
+            "подбирать модели именно под ваши условия — будь то поиск "
+            "новой коляски или нюансы ухода за той, что уже есть\n\n"
+            "Если захотите изменить ответы — [Меню] >> [👤 Профиль]\n\n"
             "Остался последний шаг — открыть доступ к подбору и рекомендациям",
-            keyboard=vk_kb.activation_kb(),
+            keyboard=vk_kb.kb_activation(),
         )
         return
 
-    # Переход на следующий шаг — НОВОЕ сообщение (т.к. может быть новое фото)
-    # Убираем кнопки со старого сообщения
+    # Переход на следующий шаг — редактируем текущее сообщение
     if cmid:
-        await _edit(vk_api, peer_id, cmid, _get_quiz_text_vk(step, selected))
-
-    await _render_quiz_step_vk(vk_api, peer_id, profile, session=session, send_new=True)
+        await _render_quiz_step_vk(vk_api, peer_id, profile, cmid=cmid)
+    else:
+        await _render_quiz_step_vk(vk_api, peer_id, profile, send_new=True)
 
 
 async def _handle_quiz_back(vk_id, peer_id, session, vk_api, cmid=None):
@@ -981,16 +1002,10 @@ async def _handle_quiz_back(vk_id, peer_id, session, vk_api, cmid=None):
     profile = await get_or_create_quiz_profile(session, user)
     await go_back(session, profile)
 
-    # Убираем кнопки со старого, отправляем новое
     if cmid:
-        branch = profile.branch or "root"
-        try:
-            step = QUIZ_CONFIG[branch][profile.current_level]
-            await _edit(vk_api, peer_id, cmid, _get_quiz_text_vk(step))
-        except KeyError:
-            pass
-
-    await _render_quiz_step_vk(vk_api, peer_id, profile, session=session, send_new=True)
+        await _render_quiz_step_vk(vk_api, peer_id, profile, cmid=cmid)
+    else:
+        await _render_quiz_step_vk(vk_api, peer_id, profile, send_new=True)
 
 
 async def _handle_quiz_restart(vk_id, peer_id, session, vk_api):
