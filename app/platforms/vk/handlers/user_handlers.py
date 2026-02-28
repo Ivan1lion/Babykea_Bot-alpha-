@@ -130,25 +130,25 @@ async def handle_message_new(message: dict, vk_api: API, sm):
             return
 
         # --- Проверяем состояние из Redis (FSM-замена) ---
-        state = await redis_client.get(f"vk_state:{vk_id}")
+        state = await _get_state(vk_id, "state")
 
         if state == "waiting_promo":
-            await redis_client.delete(f"vk_state:{vk_id}")
+            await _del_state(vk_id, "state")
             await _handle_promo_code(text, vk_id, peer_id, user, session, vk_api)
             return
 
         if state == "waiting_stroller_model":
-            await redis_client.delete(f"vk_state:{vk_id}")
+            await _del_state(vk_id, "state")
             await _handle_stroller_model(text, vk_id, peer_id, session, vk_api)
             return
 
         if state == "waiting_email":
-            await redis_client.delete(f"vk_state:{vk_id}")
+            await _del_state(vk_id, "state")
             await _handle_email_input(text, vk_id, peer_id, session, vk_api)
             return
 
         if state == "waiting_master_text":
-            await redis_client.delete(f"vk_state:{vk_id}")
+            await _del_state(vk_id, "state")
             await _handle_master_text(text, vk_id, peer_id, vk_api)
             return
 
@@ -177,7 +177,7 @@ async def handle_message_new(message: dict, vk_api: API, sm):
                 return
 
         # --- Проверяем AI-режим ---
-        ai_mode = await redis_client.get(f"vk_ai_mode:{vk_id}")
+        ai_mode = await _get_state(vk_id, "ai_mode")
         if ai_mode:
             await _handle_ai_message(text, vk_id, peer_id, user, session, vk_api, ai_mode, sm)
             return
@@ -231,7 +231,7 @@ async def _handle_command(cmd, vk_id, peer_id, user, session, vk_api, sm=None,
         await _handle_payment(vk_id, peer_id, "pay_access", session, vk_api)
 
     elif cmd == "enter_promo":
-        await redis_client.set(f"vk_state:{vk_id}", "waiting_promo", ex=300)
+        await _set_state(vk_id, "state", "waiting_promo", ex=300)
         await _send(vk_api, peer_id, "Введите код активации текстом:")
 
     # === Оплата ===
@@ -250,7 +250,7 @@ async def _handle_command(cmd, vk_id, peer_id, user, session, vk_api, sm=None,
 
     elif cmd in ("mode_catalog", "mode_info"):
         mode = "catalog" if cmd == "mode_catalog" else "info"
-        await redis_client.set(f"vk_ai_mode:{vk_id}", mode, ex=3600)
+        await _set_state(vk_id, "ai_mode", mode, ex=3600)
         if mode == "catalog":
             await _send(vk_api, peer_id,
                         "👶 Режим: Подбор коляски\n\n"
@@ -304,13 +304,13 @@ async def _handle_command(cmd, vk_id, peer_id, user, session, vk_api, sm=None,
         await _handle_promo(vk_id, peer_id, session, vk_api)
 
     elif cmd == "email":
-        await redis_client.set(f"vk_state:{vk_id}", "waiting_email", ex=300)
+        await _set_state(vk_id, "state", "waiting_email", ex=300)
         await _send(vk_api, peer_id,
                     "📧 Укажите ваш Email для получения чеков.\n\n"
                     "Отправьте адрес электронной почты в ответном сообщении:")
 
     elif cmd == "service":
-        await redis_client.set(f"vk_state:{vk_id}", "waiting_stroller_model", ex=300)
+        await _set_state(vk_id, "state", "waiting_stroller_model", ex=300)
         await _send(vk_api, peer_id,
                     "🛠 Запись на плановое ТО\n\n"
                     "Пожалуйста, напишите марку и модель вашей коляски одним сообщением "
@@ -326,7 +326,7 @@ async def _handle_command(cmd, vk_id, peer_id, user, session, vk_api, sm=None,
         await _handle_master_start(vk_id, peer_id, vk_api)
 
     elif cmd == "mf_start":
-        await redis_client.set(f"vk_state:{vk_id}", "waiting_master_text", ex=600)
+        await _set_state(vk_id, "state", "waiting_master_text", ex=300)
         await _send(vk_api, peer_id,
                     "👀 Жду вашу историю!\n\n"
                     "Опишите ситуацию во всех подробностях: что случилось, в чем сомнения "
@@ -355,7 +355,7 @@ async def _handle_command(cmd, vk_id, peer_id, user, session, vk_api, sm=None,
         await _handle_faq(cmd, vk_id, peer_id, vk_api)
 
     elif cmd == "ai_info":
-        await redis_client.set(f"vk_ai_mode:{vk_id}", "info", ex=3600)
+        await _set_state(vk_id, "ai_mode", "info", ex=3600)
         await _send(vk_api, peer_id,
                     "❓ Режим: Вопрос эксперту\n\n"
                     "Я готов отвечать! Задайте любой вопрос по эксплуатации, "
@@ -545,9 +545,14 @@ async def _run_ai_task(vk_api, peer_id, vk_id, user_text, is_catalog, user, sm):
                 answer += get_marketing_footer("info_mode")
                 await update_user_flags(session, vk_id, platform="vk", first_info_request=False)
 
+
             # Убираем HTML-теги для VK
             answer = _strip_html(answer)
             await _send(vk_api, peer_id, answer)
+
+            # Если это был первый каталожный запрос — снимаем closed_menu и показываем меню
+            if is_catalog and user_cached.first_catalog_request:
+                await _send(vk_api, peer_id, "📋 Меню доступно 👇", keyboard=vk_kb.main_menu_kb())
 
     except Exception as e:
         logger.error(f"AI task error for VK:{vk_id}: {e}", exc_info=True)
@@ -866,7 +871,7 @@ async def _handle_promo_code(code, vk_id, peer_id, user, session, vk_api):
         await _send(vk_api, peer_id,
                     "⚠️ Код не сработал\n\n"
                     "Попробуйте ещё раз. Если не получится — напишите @Master_PROkolyaski")
-        await redis_client.set(f"vk_state:{vk_id}", "waiting_promo", ex=300)
+        await _set_state(vk_id, "state", "waiting_promo", ex=300)
         return
 
     if not magazine.is_promo_active:
@@ -904,6 +909,8 @@ async def _handle_promo_code(code, vk_id, peer_id, user, session, vk_api):
 
     if branch == "service_only":
         await _send(vk_api, peer_id, success_text, keyboard=vk_kb.rules_mode_kb())
+        # service_only — closed_menu уже снят, показываем меню
+        await _send(vk_api, peer_id, "📋 Меню доступно 👇", keyboard=vk_kb.main_menu_kb())
     else:
         await _send(vk_api, peer_id, success_text, keyboard=vk_kb.first_request_kb())
 
@@ -1123,7 +1130,7 @@ async def _handle_email_input(text, vk_id, peer_id, session, vk_api):
     if not re.match(r"^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$", email):
         await _send(vk_api, peer_id,
                     "❌ Некорректный формат email. Попробуйте ещё раз:")
-        await redis_client.set(f"vk_state:{vk_id}", "waiting_email", ex=300)
+        await _set_state(vk_id, "state", "waiting_email", ex=300)
         return
 
     await session.execute(

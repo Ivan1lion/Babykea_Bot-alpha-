@@ -62,10 +62,8 @@ async def _notify_user(request: web.Request, platform: str, user_id: int, text: 
 
 def _get_user_id(payment) -> int:
     """Возвращает ID пользователя в зависимости от платформы."""
-    if payment.platform == "vk" and hasattr(payment, "telegram_id"):
-        # Для VK в будущем будем хранить vk_id
-        # Пока fallback на telegram_id
-        return payment.telegram_id
+    if payment.platform == "vk":
+        return payment.vk_id
     return payment.telegram_id
 
 
@@ -182,6 +180,21 @@ async def yookassa_webhook_handler(request: web.Request):
                 request, platform, user_id,
                 text_plain if platform == "vk" else text_tg
             )
+
+            # После оплаты полного доступа — показываем главное меню (VK)
+            if platform == "vk" and (amount == Decimal("2.00") or amount == Decimal("1900.00")):
+                vk_bot = request.app.get("vk_bot")
+                if vk_bot:
+                    try:
+                        import app.platforms.vk.keyboards as vk_kb
+                        await vk_bot.api.messages.send(
+                            user_id=user_id,
+                            message="📋 Меню доступно 👇",
+                            keyboard=vk_kb.main_menu_kb(),
+                            random_id=0,
+                        )
+                    except Exception as e:
+                        logger.error(f"VK menu send failed for {user_id}: {e}")
 
         return web.Response(text="ok")
 
