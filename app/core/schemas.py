@@ -3,7 +3,7 @@ from typing import Optional
 
 class UserCache(BaseModel):
     id: int
-    telegram_id: int
+    telegram_id: int | None = None
     username: Optional[str] = None
     promo_code: Optional[str] = None
     magazine_id: Optional[int] = None

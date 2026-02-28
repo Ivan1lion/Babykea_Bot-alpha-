@@ -50,11 +50,44 @@ import app.platforms.vk.keyboards as vk_kb
 
 logger = logging.getLogger(__name__)
 
+# Fallback хранилище состояний (если Redis недоступен)
+_memory_state: dict = {}
+
 webhook_host = os.getenv("WEBHOOK_HOST", "https://bot.babykea.ru")
 MY_USERNAME = os.getenv("MASTER_USERNAME", "Master_PROkolyaski")
 
 # ID магазинов для ПЛАТНЫХ пользователей (тот же список что в TG)
 TOP_SHOPS_IDS = [2]
+
+
+
+async def _get_state(vk_id: int, key: str) -> str | None:
+    """Получает состояние: сначала Redis, fallback на память."""
+    try:
+        val = await redis_client.get(f"vk_{key}:{vk_id}")
+        if val:
+            return val
+    except Exception:
+        pass
+    return _memory_state.get(f"vk_{key}:{vk_id}")
+
+
+async def _set_state(vk_id: int, key: str, value: str, ex: int = 300):
+    """Сохраняет состояние: сначала Redis, fallback на память."""
+    _memory_state[f"vk_{key}:{vk_id}"] = value
+    try:
+        await redis_client.set(f"vk_{key}:{vk_id}", value, ex=ex)
+    except Exception:
+        pass
+
+
+async def _del_state(vk_id: int, key: str):
+    """Удаляет состояние из обоих хранилищ."""
+    _memory_state.pop(f"vk_{key}:{vk_id}", None)
+    try:
+        await redis_client.delete(f"vk_{key}:{vk_id}")
+    except Exception:
+        pass
 
 
 # ============================================================
@@ -70,6 +103,14 @@ async def handle_message_new(message: dict, vk_api: API, sm):
 
     if not vk_id or vk_id < 0:
         return  # Сообщения от групп игнорируем
+
+    # Защита от дубликатов (VK может слать одно сообщение повторно)
+    msg_id = message.get("id") or message.get("conversation_message_id")
+    if msg_id:
+        dedup_key = f"vk_dedup:{vk_id}:{msg_id}"
+        if await redis_client.get(dedup_key):
+            return  # Уже обработали это сообщение
+        await redis_client.set(dedup_key, "1", ex=30)
 
     async with sm() as session:
         user = await get_or_create_user_vk(session, vk_id)
@@ -803,7 +844,7 @@ async def _handle_payment(vk_id, peer_id, payment_type, session, vk_api):
         await _send(vk_api, peer_id, "❌ Ошибка создания платежа. Попробуйте позже.")
         return
 
-    checkout_url = f"{WEBHOOK_HOST}/checkout/{ps.token}"
+    checkout_url = f"{webhook_host}/checkout/{ps.token}"
     text = f"{cfg['description']}\nСумма: {cfg['amount']} ₽"
     await _send(vk_api, peer_id, text, keyboard=vk_kb.payment_button_kb(checkout_url))
 
@@ -938,14 +979,22 @@ async def _handle_quiz_next(vk_id, peer_id, session, vk_api, cmid=None, event_id
     selected = profile.data.get("_selected")
 
     if not validate_next(selected):
-        # Показываем snackbar (всплывающий тост) — аналог alert в Telegram
-        if event_id:
-            with contextlib.suppress(Exception):
-                await vk_api.messages.send_message_event_answer(
-                    event_id=event_id, user_id=vk_id, peer_id=peer_id,
-                    event_data=json.dumps({"type": "show_snackbar",
-                                           "text": "⚠️ Выберите вариант, затем нажмите «Далее»"})
-                )
+        # Временное предупреждение — удалится через 2 секунды
+        try:
+            result = await vk_api.messages.send(
+                peer_id=peer_id,
+                message="⚠️ Выберите вариант, затем нажмите «Далее»",
+                random_id=random.randint(1, 2 ** 31),
+            )
+            if result:
+                await asyncio.sleep(2)
+                with contextlib.suppress(Exception):
+                    await vk_api.messages.delete(
+                        message_ids=[result],
+                        delete_for_all=True,
+                    )
+        except Exception:
+            pass
         return
 
     await save_and_next(session=session, profile=profile, step=step, selected_option=selected)
@@ -975,8 +1024,6 @@ async def _handle_quiz_next(vk_id, peer_id, session, vk_api, cmid=None, event_id
         session.add(profile)
         await session.commit()
 
-        # GIF: загрузи в альбом группы, возьми ID (формат: doc-236264711_XXXXXXX)
-        # Пока без GIF — просто текст. Когда загрузишь, добавь attachment=
         await _send(
             vk_api, peer_id,
             "✅ Отлично! Квиз-опрос завершён\n\n"
@@ -985,6 +1032,7 @@ async def _handle_quiz_next(vk_id, peer_id, session, vk_api, cmid=None, event_id
             "новой коляски или нюансы ухода за той, что уже есть\n\n"
             "Если захотите изменить ответы — [Меню] >> [👤 Профиль]\n\n"
             "Остался последний шаг — открыть доступ к подбору и рекомендациям",
+            attachment="doc-236264711_695840469",
             keyboard=vk_kb.kb_activation(),
         )
         return
@@ -1110,29 +1158,6 @@ async def _handle_master_text(text, vk_id, peer_id, vk_api):
 # ============================================================
 # УТИЛИТЫ
 # ============================================================
-
-async def _edit(vk_api: API, peer_id: int, conversation_message_id: int,
-                text: str, keyboard: str = None, attachment: str = None):
-    """Редактирует сообщение бота в VK (аналог edit_message в Telegram)."""
-    try:
-        kwargs = {
-            "peer_id": peer_id,
-            "conversation_message_id": conversation_message_id,
-            "message": text or " ",
-        }
-        if keyboard:
-            kwargs["keyboard"] = keyboard
-        else:
-            # Убираем клавиатуру (пустая inline-клавиатура)
-            from vkbottle import Keyboard
-            kwargs["keyboard"] = Keyboard(inline=True).get_json()
-        if attachment:
-            kwargs["attachment"] = attachment
-
-        await vk_api.messages.edit(**kwargs)
-    except Exception as e:
-        logger.error(f"VK edit error (cmid={conversation_message_id}): {e}")
-
 
 async def _edit(vk_api: API, peer_id: int, conversation_message_id: int,
                 text: str, keyboard: str = None, attachment: str = None):
