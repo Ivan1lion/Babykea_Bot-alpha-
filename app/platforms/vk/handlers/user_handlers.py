@@ -163,6 +163,27 @@ async def handle_message_new(message: dict, vk_api: API, sm):
             await _handle_master_text(text, vk_id, peer_id, vk_api)
             return
 
+        # --- Проверка closed_menu (аналог TG: блокируем свободный текст) ---
+        if text and not payload:
+            user_cached = await get_user_cached(session, vk_id, platform="vk")
+            if user_cached and user_cached.closed_menu_flag:
+                # Временное предупреждение — удалится через 1 секунду
+                try:
+                    result = await vk_api.messages.send(
+                        peer_id=peer_id,
+                        message="Завершите действие⤴️",
+                        random_id=random.randint(1, 2 ** 31),
+                    )
+                    if result:
+                        await asyncio.sleep(1)
+                        with contextlib.suppress(Exception):
+                            await vk_api.messages.delete(
+                                message_ids=[result],
+                                delete_for_all=True,
+                            )
+                except Exception:
+                    pass
+                return
         # --- Текстовые команды (от кнопок главного меню) ---
         text_lower = text.lower()
 
@@ -428,12 +449,6 @@ async def _handle_no_state_text(text, vk_id, peer_id, user, session, vk_api):
     """Юзер пишет текст без выбранного режима → показываем меню."""
     user_cached = await get_user_cached(session, vk_id, platform="vk")
 
-    if user_cached and user_cached.closed_menu_flag:
-        await _send(vk_api, peer_id,
-                    "⚠️ Для начала работы нужно пройти квиз-опрос и активировать доступ.",
-                    keyboard=vk_kb.quiz_start_kb())
-        return
-
     result = await session.execute(
         select(User.requests_left).where(User.vk_id == vk_id)
     )
@@ -548,10 +563,11 @@ async def _run_ai_task(vk_api, peer_id, vk_id, user_text, is_catalog, user, sm):
             answer = await ask_responses_api(
                 user_message=user_text, system_instruction=system_prompt)
 
-            # Футеры
+            # Футеры + снятие флагов
             if is_catalog and user_cached.first_catalog_request:
                 answer += get_marketing_footer("catalog_mode")
-                await update_user_flags(session, vk_id, platform="vk", first_catalog_request=False)
+                await update_user_flags(session, vk_id, platform="vk",
+                                        closed_menu_flag=False, first_catalog_request=False)
             elif not is_catalog and user_cached.first_info_request:
                 answer += get_marketing_footer("info_mode")
                 await update_user_flags(session, vk_id, platform="vk", first_info_request=False)
@@ -1052,7 +1068,7 @@ async def _handle_quiz_next(vk_id, peer_id, session, vk_api, cmid=None, event_id
             "✅ Отлично! Квиз-опрос завершён\n\n"
             "Теперь у меня есть некоторое понимание ситуации. Данные из Ваших ответов помогут мне выдавать советы и "
             "подбирать модели именно под ваши условия — будь то поиск новой коляски или малоизвестные нюансы ухода "
-            "за той, что уже стоит у Вас дома"
+            "за той, что уже стоит у Вас дома\n\n"
             "Если захотите что-то изменить в ответах, это всегда можно сделать тут:\n"
             "[🎛 Меню] >> [👤 Мой профиль]\n\n"
             "Остался последний шаг - открыть доступ к подбору, советам и рекомендациям",
