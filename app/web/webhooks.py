@@ -189,7 +189,7 @@ async def yookassa_webhook_handler(request: web.Request):
                         import app.platforms.vk.keyboards as vk_kb
                         await vk_bot.api.messages.send(
                             user_id=user_id,
-                            message="🎛 Меню доступно 👇",
+                            message="Чтобы свернуть 📋 Меню, нажмите на квадратик с 4 точками 👇",
                             keyboard=vk_kb.main_menu_kb(),
                             random_id=0,
                         )

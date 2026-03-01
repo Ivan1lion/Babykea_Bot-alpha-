@@ -417,6 +417,7 @@ async def _handle_activation(vk_id, peer_id, vk_api):
         "(В пакет также включены 50 бесплатных запросов к AI-консультанту)"
         "\n\n🎫 Есть флаер от магазина-партнера? — нажмите «Ввести код активации» для свободного "
         "доступа к моим личным видеорекомендациям и реальным советам: как выбрать и не сломать коляску",
+        attachment="photo-236264711_456239065",
         keyboard=vk_kb.activation_kb(),
     )
 
@@ -579,7 +580,10 @@ async def _run_ai_task(vk_api, peer_id, vk_id, user_text, is_catalog, user, sm):
 
             # Если это был первый каталожный запрос — снимаем closed_menu и показываем меню
             if is_catalog and user_cached.first_catalog_request:
-                await _send(vk_api, peer_id, "📋 Меню доступно 👇", keyboard=vk_kb.main_menu_kb())
+                await _send(vk_api, peer_id,
+                            "Чтобы свернуть 📋 Меню, нажмите на квадратик с 4 точками 👇",
+                            keyboard=vk_kb.main_menu_kb()
+                            )
 
     except Exception as e:
         logger.error(f"AI task error for VK:{vk_id}: {e}", exc_info=True)
@@ -930,8 +934,9 @@ async def _handle_promo_code(code, vk_id, peer_id, user, session, vk_api):
     # Формируем ответ
     mag_name = magazine.name
     if mag_name and mag_name != "[Babykea]":
-        success_text = (f"✅ Активация по промокоду магазина {mag_name}\n\n"
-                        "Контакты продавца — в разделе «📍 Магазин»\n\n"
+        success_text = (f"✅ Проведена успешная активация по промокоду магазина детских колясок {mag_name}\n\n"
+                        "Контакты продавца будут находиться в меню в разделе\n"
+                        "[📍 Магазин колясок]"
                         "Теперь проверим бота в деле 👇")
     else:
         success_text = ("✅ Код принят! Добро пожаловать"
@@ -942,7 +947,10 @@ async def _handle_promo_code(code, vk_id, peer_id, user, session, vk_api):
     if branch == "service_only":
         await _send(vk_api, peer_id, success_text, keyboard=vk_kb.rules_mode_kb())
         # service_only — closed_menu уже снят, показываем меню
-        await _send(vk_api, peer_id, "📋 Меню доступно 👇", keyboard=vk_kb.main_menu_kb())
+        await _send(vk_api, peer_id,
+                    "Чтобы свернуть 📋 Меню, нажмите на квадратик с 4 точками 👇",
+                    keyboard=vk_kb.main_menu_kb()
+                    )
     else:
         await _send(vk_api, peer_id, success_text, keyboard=vk_kb.first_request_kb())
 
