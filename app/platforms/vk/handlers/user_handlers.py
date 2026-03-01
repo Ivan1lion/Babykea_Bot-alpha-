@@ -52,6 +52,7 @@ logger = logging.getLogger(__name__)
 
 # Fallback хранилище состояний (если Redis недоступен)
 _memory_state: dict = {}
+_dedup_cache: set = set()
 
 webhook_host = os.getenv("WEBHOOK_HOST", "https://bot.babykea.ru")
 MY_USERNAME = os.getenv("MASTER_USERNAME", "Master_PROkolyaski")
@@ -108,9 +109,18 @@ async def handle_message_new(message: dict, vk_api: API, sm):
     msg_id = message.get("id") or message.get("conversation_message_id")
     if msg_id:
         dedup_key = f"vk_dedup:{vk_id}:{msg_id}"
-        if await redis_client.get(dedup_key):
-            return  # Уже обработали это сообщение
-        await redis_client.set(dedup_key, "1", ex=30)
+        # Проверяем в памяти (работает всегда, даже без Redis)
+        if dedup_key in _dedup_cache:
+            return
+        _dedup_cache.add(dedup_key)
+        # Чистим старые записи если их слишком много
+        if len(_dedup_cache) > 10000:
+            _dedup_cache.clear()
+        # Дублируем в Redis если доступен
+        try:
+            await redis_client.set(dedup_key, "1", ex=30)
+        except Exception:
+            pass
 
     async with sm() as session:
         user = await get_or_create_user_vk(session, vk_id)
@@ -122,6 +132,7 @@ async def handle_message_new(message: dict, vk_api: API, sm):
 
             # Перехватываем системную кнопку "Начать"
             if cmd == "start":
+                logger.info(f"VK START: text={text!r}, payload={payload}, vk_id={vk_id}")
                 await _handle_start(vk_id, peer_id, user, session, vk_api)
                 return
 
