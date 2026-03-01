@@ -204,11 +204,11 @@ def main_menu_kb() -> str:
     VK не поддерживает /команды, поэтому используем Text-кнопки.
     """
     kb = Keyboard(one_time=False)
-    kb.add(Text("⁉️ Как подобрать коляску", payload={"cmd": "guide"}), color=KeyboardButtonColor.PRIMARY)
+    kb.add(Text("⁉️ Как подобрать коляску", payload={"cmd": "guide"}))
     kb.row()
-    kb.add(Text("💢 Как не сломать коляску", payload={"cmd": "rules"}), color=KeyboardButtonColor.PRIMARY)
+    kb.add(Text("💢 Как не сломать коляску", payload={"cmd": "rules"}))
     kb.row()
-    kb.add(Text("✅ Как продлить жизнь коляске", payload={"cmd": "manual"}), color=KeyboardButtonColor.PRIMARY)
+    kb.add(Text("✅ Как продлить жизнь коляске", payload={"cmd": "manual"}))
     kb.row()
     kb.add(Text("🤖 AI-консультант", payload={"cmd": "ai_consultant"}))
     kb.row()
@@ -222,4 +222,13 @@ def main_menu_kb() -> str:
     kb.row()
     kb.add(Text("📃 Пользовательское соглашение", payload={"cmd": "offer"}))
     kb.row()
+    return kb.get_json()
+
+
+
+def guide_kb() -> str:
+    kb = Keyboard(inline=True)
+    kb.add(Callback("🤖 Начать умный подбор", payload={"cmd": "ai_consultant"}), color=KeyboardButtonColor.PRIMARY)
+    kb.row()
+    kb.add(Callback("🔄 Перепройти квиз", payload={"cmd": "quiz_restart"}))
     return kb.get_json()
