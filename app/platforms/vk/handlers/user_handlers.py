@@ -55,8 +55,11 @@ logger = logging.getLogger(__name__)
 _memory_state: dict = {}
 _dedup_cache: set = set()
 
-WEBHOOK_HOST = os.getenv("WEBHOOK_HOST", "https://bot.babykea.ru")
-MY_USERNAME = os.getenv("MASTER_USERNAME", "Master_PROkolyaski")
+WEBHOOK_HOST = os.getenv("WEBHOOK_HOST")
+MY_USERNAME = os.getenv("MASTER_USERNAME")
+VK_START_POST = os.getenv("VK_START_POST")
+VK_GUIDE_POST = os.getenv("VK_GUIDE_POST")
+
 
 # ID магазинов для ПЛАТНЫХ пользователей (тот же список что в TG)
 TOP_SHOPS_IDS = [2]
@@ -201,14 +204,15 @@ async def handle_message_new(message: dict, vk_api: API, sm):
 
         # Кнопки главного меню
         menu_map = {
-            "🤖 ai-консультант": "ai_consultant",
-            "📖 путеводитель": "guide",
-            "💢 правила": "rules",
-            "✅ памятка": "manual",
-            "📍 магазин": "contacts",
-            "📝 блог": "blog",
-            "❓ помощь": "help",
-            "👤 профиль": "config",
+            "⁉️ Как подобрать коляску": "guide",
+            "💢 Как не сломать коляску": "rules",
+            "✅ Как продлить жизнь коляске": "manual",
+            "🤖 AI-консультант": "ai_consultant",
+            "🧔‍♂️ Блог мастера": "blog",
+            "🆘 Помощь": "help",
+            "👤 Мой профиль": "config",
+            "📍 Магазин колясок": "contacts",
+            "📃 Пользовательское соглашение": "offer",
         }
 
         for btn_text, cmd in menu_map.items():
@@ -412,7 +416,7 @@ async def _handle_start(vk_id, peer_id, user, session, vk_api):
         vk_api,
         peer_id,
         "",  # Пустая строка, так как текст нам не нужен
-        attachment="video-236264711_456239020_ln-DAKyTAWQvDPmBKAi8y",  # Базовый ID + ключ доступа
+        attachment=VK_START_POST,  # Базовый ID + ключ доступа
         keyboard=vk_kb.quiz_start_kb(),
     )
 
@@ -653,7 +657,7 @@ async def _handle_guide(vk_id, peer_id, user, session, vk_api):
             )
     # Видео из сообщества + текст + кнопки
     await _send(vk_api, peer_id, text,
-                attachment="video-236264711_456239020_ln-DAKyTAWQvDPmBKAi8y",
+                attachment=VK_GUIDE_POST,
                 keyboard=vk_kb.guide_kb())
 
 

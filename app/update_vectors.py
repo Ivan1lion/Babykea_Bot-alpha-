@@ -213,11 +213,21 @@ async def run_update_cycle():
         feed_groups = defaultdict(list)
         for mag in all_magazines:
             raw_url = mag.feed_url
-            if raw_url and raw_url.strip() != "Google_Search":
+
+            # 1. Проверяем, что поле в базе физически не пустое (не None)
+            if raw_url:
                 clean_url = raw_url.strip()
-                feed_groups[clean_url].append(mag)
+
+                # 2. Пуленепробиваемый фильтр: пускаем ТОЛЬКО настоящие ссылки
+                if clean_url.startswith(("http://", "https://")):
+                    feed_groups[clean_url].append(mag)
+                else:
+                    # Сюда автоматически отлетят PREMIUM_AGGREGATOR, старый Google_Search,
+                    # опечатки менеджеров и любой другой текст без http
+                    logger.info(f"⏭ Магазин {mag.name} пропущен (нет ссылки: {clean_url})")
             else:
-                logger.info(f"⏭ Магазин {mag.name} пропущен")
+                # Сюда отлетят пустые поля, где работает поиск по Яндекс Картинкам
+                logger.info(f"⏭ Магазин {mag.name} пропущен (поле feed_url полностью пустое)")
 
         async with aiohttp.ClientSession() as http_session:
             for feed_url, mags_in_group in feed_groups.items():

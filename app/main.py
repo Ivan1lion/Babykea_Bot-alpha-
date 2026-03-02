@@ -32,7 +32,7 @@ logging.basicConfig(
     level=logging.INFO,  # При деплое поставить level=logging.WARNING
     format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
     handlers=[
-        logging.StreamHandler(sys.stdout)  # ← Добавить эту строку
+        logging.StreamHandler(sys.stdout)
     ]
 )
 
