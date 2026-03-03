@@ -1102,7 +1102,8 @@ async def _handle_quiz_next(vk_id, peer_id, session, vk_api, cmid=None, event_id
         if profile.completed_once:
             # Повторное прохождение
             await _send(vk_api, peer_id,
-                        "✅ Квиз завершён\n\nВаши ответы обновлены",
+                        "✅ Квиз завершён"
+                        "\n\nВаши ответы обновлены и учтены новые данные",
                         keyboard=vk_kb.ai_mode_kb())
             return
 
@@ -1145,8 +1146,18 @@ async def _handle_quiz_back(vk_id, peer_id, session, vk_api, cmid=None):
 
 
 async def _handle_quiz_restart(vk_id, peer_id, session, vk_api):
-    """Аналог /quiz_restart."""
-    await _handle_quiz_start(vk_id, peer_id, session, vk_api)
+    """Рестарт квиза из профиля — сохраняем completed_once."""
+    user = await get_or_create_user_vk(session, vk_id)
+    profile = await get_or_create_quiz_profile(session, user)
+
+    profile.branch = None
+    profile.current_level = 1
+    profile.completed = False
+    profile.data = {}
+    session.add(profile)
+    await session.commit()
+
+    await _render_quiz_step_vk(vk_api, peer_id, profile, send_new=True)
 
 
 async def _render_quiz_step_vk(vk_api, peer_id, profile, selected=None,
@@ -1311,6 +1322,6 @@ def _strip_html(text: str) -> str:
     # Заменяем <b>text</b> на text
     text = re.sub(r'<br\s*/?>', '\n', text)
     text = re.sub(r'<blockquote>(.*?)</blockquote>', r'\1', text, flags=re.DOTALL)
-    text = re.sub(r"<a\s+href='([^']*)'[^>]*>(.*?)</a>", r'\2: \1', text, flags=re.DOTALL)
+    text = re.sub(r'<a\s+href=[\'"]([^\'"]*)[\'"][^>]*>(.*?)</a>', r'\2\n\1', text, flags=re.DOTALL)
     text = re.sub(r'<[^>]+>', '', text)
     return text
