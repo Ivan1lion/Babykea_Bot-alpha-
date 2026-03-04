@@ -80,6 +80,12 @@ async def main():
     logger.info(f"VK Bot server running on {WEBAPP_HOST}:{WEBAPP_PORT}")
     logger.info(f"Callback URL: /vk/callback")
 
+    # === Воркер планового ТО (только для VK-юзеров) ===
+    from app.core.services.service_worker import run_service_notifications
+    asyncio.create_task(
+        run_service_notifications(bot=None, session_maker=session_maker, vk_api=vk_api)
+    )
+
     # === 5. Graceful shutdown ===
     stop_event = asyncio.Event()
 

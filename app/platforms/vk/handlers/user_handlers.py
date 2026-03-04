@@ -21,6 +21,7 @@ import time
 from vkbottle import API
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
+from datetime import datetime, timezone
 
 from app.core.db.models import User, Magazine, UserQuizProfile
 from app.core.db.config import session_maker
@@ -407,6 +408,20 @@ async def _handle_command(cmd, vk_id, peer_id, user, session, vk_api, sm=None,
                     "❓ Режим: Вопрос эксперту\n\n"
                     "Я готов отвечать! Задайте любой вопрос по эксплуатации, "
                     "ремонту или сравнению колясок")
+
+    elif cmd == "to_feed_like":
+        await session.execute(
+            update(User).where(User.vk_id == vk_id).values(first_to_feedback="like")
+        )
+        await session.commit()
+        await _send(vk_api, peer_id, "Отлично! Значит все работает в штатном режиме 🤝")
+
+    elif cmd == "to_feed_dislike":
+        await session.execute(
+            update(User).where(User.vk_id == vk_id).values(first_to_feedback="dislike")
+        )
+        await session.commit()
+        await _send(vk_api, peer_id, "Спасибо! Я проверю Вашу запись и подправлю настройки 🤝")
 
 
 # ============================================================
@@ -1203,7 +1218,6 @@ async def _render_quiz_step_vk(vk_api, peer_id, profile, selected=None,
 
 async def _handle_stroller_model(text, vk_id, peer_id, session, vk_api):
     """Запись модели коляски на ТО."""
-    from datetime import datetime, timezone
     try:
         await session.execute(
             update(User).where(User.vk_id == vk_id).values(
@@ -1220,7 +1234,7 @@ async def _handle_stroller_model(text, vk_id, peer_id, session, vk_api):
 
     await _send(vk_api, peer_id,
                 "✅ Ваша коляска поставлена на учет!\n\n"
-                    "Модель: {user_model}\n\n"
+                    f"Модель: {text}\n\n"
                     "Уведомление придет, когда настанет время для ТО. "
                     "Система учитывает особенности вашей модели и текущее время года, "
                     "чтобы напомнить о профилактике ровно тогда, когда это действительно необходимо 🗓\n\n"

@@ -1,4 +1,5 @@
 ﻿import os
+import json
 import asyncio
 from datetime import datetime, timezone, timedelta
 from sqlalchemy import select, update
@@ -13,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 # Настройки рассылки (через сколько дней слать и ID сообщений в тех-канале)
 tech_channel_id = int(os.getenv("TECH_CHANNEL_ID"))
-
+VK_SERVICE_VIDEO = os.getenv("VK_SERVICE_VIDEO")
 
 # SERVICE_STAGES = {
 #     0: {"days": 3, "msg_id": 105},  # 0 уровень -> ждет 3 дня -> шлем msg_id 101 -> переход на ур. 1
@@ -30,7 +31,7 @@ SERVICE_STAGES = {
 _MAX_RESTART_DELAY = 300
 
 
-async def _service_notifications_loop(bot: Bot, session_maker):
+async def _service_notifications_loop(bot, session_maker, vk_api=None):
     """Внутренний цикл воркера. Выполняет одну итерацию проверки и уведомлений."""
     while True:
         try:
@@ -55,33 +56,65 @@ async def _service_notifications_loop(bot: Bot, session_maker):
 
                     if now >= target_date:
                         try:
-                            if user.service_level == 0:
-                                feedback_kb = InlineKeyboardMarkup(inline_keyboard=[
-                                    [
-                                        InlineKeyboardButton(text="👍", callback_data="to_feed_like"),
-                                        InlineKeyboardButton(text="👎", callback_data="to_feed_dislike")
-                                    ]
-                                ])
+                            # === TELEGRAM (только если bot передан) ===
+                            if user.telegram_id and bot:
+                                if user.service_level == 0:
+                                    feedback_kb = InlineKeyboardMarkup(inline_keyboard=[
+                                        [
+                                            InlineKeyboardButton(text="👍", callback_data="to_feed_like"),
+                                            InlineKeyboardButton(text="👎", callback_data="to_feed_dislike")
+                                        ]
+                                    ])
+                                    await bot.copy_message(
+                                        chat_id=user.telegram_id,
+                                        from_chat_id=tech_channel_id,
+                                        message_id=stage["msg_id"],
+                                        reply_markup=feedback_kb,
+                                        caption="\u200b"
+                                    )
+                                else:
+                                    await bot.copy_message(
+                                        chat_id=user.telegram_id,
+                                        from_chat_id=tech_channel_id,
+                                        message_id=stage["msg_id"],
+                                        caption="🛠 Пришло время планового обслуживания вашей коляски!"
+                                    )
 
-                                await bot.copy_message(
-                                    chat_id=user.telegram_id,
-                                    from_chat_id=tech_channel_id,
-                                    message_id=stage["msg_id"],
-                                    reply_markup=feedback_kb,
-                                    caption="\u200b"
-                                )
+                            # === VK (только если vk_api передан) ===
+                            elif user.vk_id and vk_api:
+                                if user.service_level == 0:
+                                    feedback_kb = json.dumps({
+                                        "inline": True,
+                                        "buttons": [[
+                                            {"action": {"type": "callback", "label": "👍",
+                                                        "payload": json.dumps({"cmd": "to_feed_like"})},
+                                             "color": "positive"},
+                                            {"action": {"type": "callback", "label": "👎",
+                                                        "payload": json.dumps({"cmd": "to_feed_dislike"})},
+                                             "color": "negative"}
+                                        ]]
+                                    })
+                                    await vk_api.messages.send(
+                                        user_id=user.vk_id,
+                                        message="\u200b",
+                                        attachment=VK_SERVICE_VIDEO,
+                                        keyboard=feedback_kb,
+                                        random_id=0,
+                                    )
+                                else:
+                                    await vk_api.messages.send(
+                                        user_id=user.vk_id,
+                                        message="🛠 Пришло время планового обслуживания вашей коляски!",
+                                        attachment=VK_SERVICE_VIDEO,
+                                        random_id=0,
+                                    )
 
                             else:
-                                await bot.copy_message(
-                                    chat_id=user.telegram_id,
-                                    from_chat_id=tech_channel_id,
-                                    message_id=stage["msg_id"],
-                                    caption="🛠 Пришло время планового обслуживания вашей коляски!"
-                                )
+                                # Юзер не относится к этому боту — пропускаем
+                                continue
 
                             user.service_level += 1
                             await session.commit()
-
                             await asyncio.sleep(0.5)
 
                         except TelegramForbiddenError:
@@ -93,6 +126,7 @@ async def _service_notifications_loop(bot: Bot, session_maker):
                         except Exception as e:
                             logger.error(f"Непредвиденная ошибка при отправке ТО: {e}")
 
+
         except Exception as e:
             # Пробрасываем наружу — внешний цикл перехватит и перезапустит воркер
             raise
@@ -101,7 +135,7 @@ async def _service_notifications_loop(bot: Bot, session_maker):
         await asyncio.sleep(5)
 
 
-async def run_service_notifications(bot: Bot, session_maker):
+async def run_service_notifications(bot=None, session_maker=None, vk_api=None):
     """
     Обёртка с автоматическим перезапуском воркера при падении.
     Использует экспоненциальную задержку: 5с -> 10с -> 20с -> ... -> 300с (5 мин).
@@ -113,7 +147,7 @@ async def run_service_notifications(bot: Bot, session_maker):
         try:
             logger.info("⚙️ Запущен фоновый воркер планового ТО...")
             restart_delay = 5  # Сбрасываем задержку при успешном старте
-            await _service_notifications_loop(bot, session_maker)
+            await _service_notifications_loop(bot, session_maker, vk_api)
 
         except asyncio.CancelledError:
             # Бот останавливается штатно — выходим без перезапуска

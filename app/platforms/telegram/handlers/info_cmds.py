@@ -387,7 +387,7 @@ async def process_stroller_model(message: Message, state: FSMContext, session: A
     # 3. Отправляем подтверждение юзеру
     success_text = (
         "✅ <b>Ваша коляска поставлена на учет!</b>\n\n"
-        "<b>Модель:</b> <i>{user_model}</i>\n\n"
+        f"<b>Модель:</b> <i>{user_model}</i>\n\n"
         "Уведомление придет, когда настанет время для ТО. "
         "Система учитывает особенности вашей модели и текущее время года, "
         "чтобы напомнить о профилактике ровно тогда, когда это действительно необходимо 🗓\n\n"
@@ -425,6 +425,6 @@ async def process_to_feedback(callback: CallbackQuery, session: AsyncSession):
 
     # 4. Отправляем всплывающее уведомление (alert)
     if feedback_value == "like":
-        await callback.answer("Спасибо! Рад, что могу быть полезным 🤝", show_alert=True)
+        await callback.answer("Отлично! Значит все работает в штатном режиме 🤝", show_alert=True)
     else:
-        await callback.answer("Спасибо за честный отзыв. Буду улучшать контент! 🤝", show_alert=True)
+        await callback.answer("Спасибо! Я проверю Вашу запись и подправлю настройки 🤝", show_alert=True)
