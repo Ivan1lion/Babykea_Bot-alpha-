@@ -323,8 +323,8 @@ async def process_get_wb_link(callback: CallbackQuery, session: AsyncSession):
         await session.commit()
     # 2. ФОРМИРУЕМ НОВЫЙ ТЕКСТ (С добавленной ссылкой)
     new_text = (
-        "<a href='https://www.wildberries.ru/catalog/191623733/detail.aspx?targetUrl=MI'>Смазка силиконовая "
-        "для колясок https://www.wildberries.ru/catalog/191623733/detail.aspx?targetUrl=MI</a>"
+        "<a href='https://www.wildberries.ru/catalog/274474180/detail.aspx'>Смазка силиконовая "
+        "для колясок https://www.wildberries.ru/catalog/274474180/detail.aspx</a>"
     )
     # 3. РЕДАКТИРУЕМ СООБЩЕНИЕ
     try:

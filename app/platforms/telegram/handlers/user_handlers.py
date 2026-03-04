@@ -655,7 +655,8 @@ async def handle_ai_message(message: Message, state: FSMContext, session: AsyncS
         await message.answer(
             f"💡 Чтобы я мог выдать точный результат и завершить персональный анализ под ваши условия, выберите "
             f"пакет запросов ниже"
-            f"\n\n<a href='https://telegra.ph/AI-konsultant-rabotaet-na-platnoj-platforme-httpsplatformopenaicom-01-16'>"
+            f"\n\n<a href='https://telegra.ph/CHtoby-otvety-byli-tochnymi-i-poleznymi-bot-rabotaet-na-professionalnoj-"
+            f"platforme-iskusstvennogo-intellekta-OpenAI--ehto-platnyj-03-04'>"
             "(Как это работает и что считается запросом?)</a>",
             reply_markup=kb.pay
         )
@@ -793,7 +794,8 @@ async def process_top_up_balance_click(callback: CallbackQuery):
     await callback.message.answer(
         f"💡 Чтобы я мог выдать точный результат и завершить персональный анализ под ваши условия, выберите "
         f"пакет запросов ниже"
-        f"\n\n<a href='https://telegra.ph/AI-konsultant-rabotaet-na-platnoj-platforme-httpsplatformopenaicom-01-16'>"
+        f"\n\n<a href='https://telegra.ph/CHtoby-otvety-byli-tochnymi-i-poleznymi-bot-rabotaet-na-professionalnoj-"
+        f"platforme-iskusstvennogo-intellekta-OpenAI--ehto-platnyj-03-04'>"
         "(Как это работает и что считается запросом?)</a>",
         reply_markup=kb.pay
     )

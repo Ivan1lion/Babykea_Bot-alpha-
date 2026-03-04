@@ -68,6 +68,15 @@ def get_wb_link_kb() -> str:
     return kb.get_json()
 
 
+def pamyatka_kb() -> str:
+    """Клавиатура для памятки: ТО + WB ссылка."""
+    kb = Keyboard(inline=True)
+    kb.add(Callback("🛠 Встать на плановое ТО", payload={"cmd": "service"}))
+    kb.row()
+    kb.add(Callback("🟣 Смазка на WB", payload={"cmd": "get_wb_link"}), color=KeyboardButtonColor.PRIMARY)
+    return kb.get_json()
+
+
 def ai_mode_kb() -> str:
     kb = Keyboard(inline=True)
     kb.add(Callback("🎯 Подобрать коляску", payload={"cmd": "mode_catalog"}), color=KeyboardButtonColor.PRIMARY)
