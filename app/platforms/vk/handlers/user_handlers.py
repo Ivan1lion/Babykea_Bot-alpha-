@@ -409,19 +409,38 @@ async def _handle_command(cmd, vk_id, peer_id, user, session, vk_api, sm=None,
                     "Я готов отвечать! Задайте любой вопрос по эксплуатации, "
                     "ремонту или сравнению колясок")
 
-    elif cmd == "to_feed_like":
-        await session.execute(
-            update(User).where(User.vk_id == vk_id).values(first_to_feedback="like")
-        )
-        await session.commit()
-        await _send(vk_api, peer_id, "Отлично! Значит все работает в штатном режиме 🤝")
+    # elif cmd == "to_feed_like":
+    #     await session.execute(
+    #         update(User).where(User.vk_id == vk_id).values(first_to_feedback="like")
+    #     )
+    #     await session.commit()
+    #     await _send(vk_api, peer_id, "Отлично! Значит все работает в штатном режиме 🤝")
+    #
+    # elif cmd == "to_feed_dislike":
+    #     await session.execute(
+    #         update(User).where(User.vk_id == vk_id).values(first_to_feedback="dislike")
+    #     )
+    #     await session.commit()
+    #     await _send(vk_api, peer_id, "Спасибо! Я проверю Вашу запись и подправлю настройки 🤝")
 
-    elif cmd == "to_feed_dislike":
+    elif cmd in ("to_feed_like", "to_feed_dislike"):
+        feedback_value = "like" if cmd == "to_feed_like" else "dislike"
         await session.execute(
-            update(User).where(User.vk_id == vk_id).values(first_to_feedback="dislike")
+            update(User).where(User.vk_id == vk_id).values(first_to_feedback=feedback_value)
         )
         await session.commit()
-        await _send(vk_api, peer_id, "Спасибо! Я проверю Вашу запись и подправлю настройки 🤝")
+        # Удаляем сообщение с видео и кнопками
+        if conversation_message_id:
+            with contextlib.suppress(Exception):
+                await vk_api.messages.delete(
+                    peer_id=peer_id,
+                    conversation_message_ids=[conversation_message_id],
+                    delete_for_all=True,
+                )
+        await _send(vk_api, peer_id,
+                    "Отлично! Значит все работает в штатном режиме 🤝" if feedback_value == "like"
+                    else "Спасибо! Я проверю Вашу запись и подправлю настройки 🤝")
+
 
 
 # ============================================================

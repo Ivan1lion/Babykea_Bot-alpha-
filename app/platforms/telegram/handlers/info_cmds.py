@@ -417,11 +417,11 @@ async def process_to_feedback(callback: CallbackQuery, session: AsyncSession):
     await session.execute(stmt)
     await session.commit()
 
-    # 3. Убираем клавиатуру (кнопки исчезнут)
+    # 3. Удаляем сообщение с видео и кнопками
     try:
-        await callback.message.edit_reply_markup(reply_markup=None)
+        await callback.message.delete()
     except Exception:
-        pass  # Игнорируем ошибку, если вдруг сообщение уже старое
+        pass
 
     # 4. Отправляем всплывающее уведомление (alert)
     if feedback_value == "like":
