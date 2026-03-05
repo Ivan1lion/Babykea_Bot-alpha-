@@ -63,6 +63,7 @@ VK_START_POST = os.getenv("VK_START_POST")
 VK_GUIDE_POST = os.getenv("VK_GUIDE_POST")
 VK_MANUAL_POST = os.getenv("VK_MANUAL_POST")
 VK_RULES_POST = os.getenv("VK_RULES_POST")
+VK_AI_VIDEO = os.getenv("VK_AI_VIDEO", "")
 
 
 # ID магазинов для ПЛАТНЫХ пользователей (тот же список что в TG)
@@ -499,19 +500,38 @@ async def _handle_no_state_text(text, vk_id, peer_id, user, session, vk_api):
     """Юзер пишет текст без выбранного режима → показываем меню."""
     user_cached = await get_user_cached(session, vk_id, platform="vk")
 
-    result = await session.execute(
-        select(User.requests_left).where(User.vk_id == vk_id)
-    )
-    real_balance = result.scalar_one_or_none() or 0
+    if user_cached and user_cached.show_intro_message:
+        # Первое сообщение: видео + текст без баланса
+        await update_user_flags(session, vk_id, platform="vk", show_intro_message=False)
 
-    await _send(
-        vk_api, peer_id,
-        f"👋 Чтобы я мог помочь, выберите режим работы:\n\n"
-        f"[Подобрать коляску] - поиск подходящей коляски\n\n"
-        f"[Другой запрос] - консультации, сравнения, эксплуатация\n\n"
-        f"Запросов на балансе: [ {real_balance} ]",
-        keyboard=vk_kb.ai_mode_with_balance_kb(),
-    )
+        await _send(
+            vk_api, peer_id,
+            "AI-консультант готов к работе!\n\n"
+            "Он умеет подбирать коляски, а также отвечать на любые вопросы по эксплуатации\n\n"
+            "👇 Выберите режим работы:\n\n"
+            "[Подобрать коляску] - только для поиска (подбора) подходящей для Вас коляски\n\n"
+            "[Другой запрос] - для консультаций, решений вопросов по эксплуатации, "
+            "анализа и сравнения уже известных Вам моделей колясок",
+            attachment=VK_AI_VIDEO,
+            keyboard=vk_kb.ai_mode_kb(),
+        )
+    else:
+        # Все последующие: текст с балансом
+        result = await session.execute(
+            select(User.requests_left).where(User.vk_id == vk_id)
+        )
+        real_balance = result.scalar_one_or_none() or 0
+
+        await _send(
+            vk_api, peer_id,
+            f"👋 Чтобы я мог помочь, выберите режим работы:\n\n"
+            f"[Подобрать коляску] - только для поиска (подбора) подходящей для Вас коляски\n\n"
+            f"[Другой запрос] - для консультаций, решений вопросов по эксплуатации, "
+            f"анализа и сравнения уже известных Вам моделей колясок\n\n"
+            f"Количество запросов\n"
+            f"на вашем балансе: [ {real_balance} ]",
+            keyboard=vk_kb.ai_mode_with_balance_kb(),
+        )
 
 
 # ============================================================
