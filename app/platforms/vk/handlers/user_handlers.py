@@ -861,7 +861,8 @@ async def _handle_blog(vk_id, peer_id, session, vk_api):
     """Аналог /blog."""
     text = (
         "Мой канал @ivan_prokolyaski\n\n"
-        "0. Обо мне\n\n"
+        "0. Обо мне\n"
+        "(vk.com/@ivan_prokolyaski-obo-mne)\n\n"
         "#мысливслух\n"
         "(не рекомендации, но информация к размышлению молодым родителям)\n\n"
         "1. Почему при выборе коляски нельзя доверять отзывам в интернете\n\n"

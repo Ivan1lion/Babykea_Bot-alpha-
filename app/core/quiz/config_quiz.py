@@ -357,7 +357,7 @@ QUIZ_CONFIG = {
                     "button": "Цельная",
                     "preview": {
                         "photo": TG_UPLOADED_PHOTOS.get("222.jpg"),
-                        "photo_vk": VK_UPLOADED_PHOTOS.get("22.jpg"),
+                        "photo_vk": VK_UPLOADED_PHOTOS.get("222.jpg"),
                         "text": "<blockquote>Самый распространённый вид прогулочных колясок. Идеально подходит для ежедневного "
                                 "использования</blockquote>",
                         "text_vk": "Самый распространённый вид прогулочных колясок. Идеально подходит для ежедневного "
